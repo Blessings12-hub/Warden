@@ -346,6 +346,9 @@ const enemies2 = [
   makeEnemy(-14, 10, zone2, 6, 0x4a1a4a, 1.4)
 ];
 const boss = makeEnemy(0, -22, zone2, 18, 0x8f3b42, 2.1);
+boss.userData.attackCooldown = 2.2;
+boss.userData.telegraph = 0;
+boss.userData.phase = 1;
 boss.visible = false;
 boss.userData.boss = true;
 const bossRing = new THREE.Mesh(new THREE.TorusGeometry(2.5,.06,8,32), new THREE.MeshBasicMaterial({color:0xff624f,transparent:true,opacity:.5}));
@@ -572,16 +575,26 @@ function animate() {
   else if (stamina < 100) { stamina = Math.min(100, stamina + 24 * dt); updateStamina(); }
 
   // --- Enemy AI: chase + simple combat (active zone only) ---
-  const activeEnemies = gameState.currentZone === 1 ? enemies1 : enemies2;
+  const activeEnemies = gameState.currentZone === 1 ? enemies1 : enemies2.concat(gameState.bossAwakened ? [boss] : []);
   activeEnemies.forEach(en => {
-    if (en.userData.hp <= 0) { en.visible = false; return; }
+    if (en.userData.hp <= 0) { en.visible = false; if (en.userData.boss) { bossWrap.style.opacity='0'; endGame(true); } return; }
     const dist = en.position.distanceTo(player.position);
-    if (dist < 20) {
+    const isBoss = !!en.userData.boss;
+    if (isBoss) {
+      bossBar.style.width = Math.max(0, en.userData.hp / en.userData.maxHp * 100) + '%';
+      en.userData.attackCooldown -= dt;
+      if (en.userData.telegraph > 0) { en.userData.telegraph -= dt; en.children[0].material.emissive.set(0xffb000); en.children[0].material.emissiveIntensity = 2.5; }
+      else if (en.userData.attackCooldown <= 0 && dist < 9) { en.userData.telegraph = .55; en.userData.attackCooldown = en.userData.phase === 2 ? 1.25 : 1.8; }
+      else if (en.userData.attackCooldown <= 0) en.userData.attackCooldown = .6;
+      if (en.userData.telegraph <= 0 && en.userData.telegraph > -.08) { if (dist < 3.2) damagePlayer(en.userData.phase === 2 ? 18 : 12); en.userData.telegraph = -1; }
+      if (en.userData.hp < en.userData.maxHp * .5) en.userData.phase = 2;
+    }
+    if (dist < (isBoss ? 22 : 20)) {
       const dir = player.position.clone().sub(en.position).normalize();
-      if (dist > 1.4) {
-        en.position.addScaledVector(dir, 2.2 * dt);
+      if (dist > (isBoss ? 2.7 : 1.4)) {
+        en.position.addScaledVector(dir, (isBoss ? 1.5 : 2.2) * dt);
         en.rotation.y = Math.atan2(dir.x, dir.z);
-      } else if (en.userData.hitCooldown <= 0) {
+      } else if (en.userData.hitCooldown <= 0 && !isBoss) {
         damagePlayer(8);
         en.userData.hitCooldown = 1.0;
       }
