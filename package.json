@@ -1,0 +1,9 @@
+{
+  "name": "warden-3d-adventure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phone-first open-world 3D adventure game starter (Three.js, no build step)",
+  "scripts": {
+    "dev": "echo 'Static site — just open index.html in a browser, or run: npx serve .'"
+  }
+}
