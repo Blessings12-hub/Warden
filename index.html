@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Warden — 3D Adventure Starter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; touch-action: none; }
+  #game-canvas { display: block; width: 100%; height: 100%; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  #cutscene {
+    position: fixed; inset: 0; background: #000; z-index: 100;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 12%; transition: opacity 1.2s ease;
+  }
+  #cutscene p {
+    color: #eee; font-size: 15px; letter-spacing: 1px; opacity: 0;
+    animation: fadeIn 2s ease forwards; text-align: center; padding: 0 20px;
+  }
+  @keyframes fadeIn { to { opacity: 0.9; } }
+  #skip-btn {
+    position: fixed; top: 20px; right: 20px; z-index: 101;
+    background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    padding: 8px 16px; border-radius: 20px; font-size: 13px; pointer-events: all;
+  }
+
+  #joystick-zone {
+    position: absolute; left: 24px; bottom: 24px; width: 130px; height: 130px;
+    pointer-events: all;
+  }
+  #joystick-base {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25);
+  }
+  #joystick-knob {
+    position: absolute; top: 35px; left: 35px; width: 60px; height: 60px; border-radius: 50%;
+    background: rgba(255,255,255,0.35); pointer-events: none;
+  }
+
+  #attack-btn {
+    position: absolute; right: 28px; bottom: 40px; width: 78px; height: 78px; border-radius: 50%;
+    background: rgba(200,40,40,0.55); border: 2px solid rgba(255,255,255,0.4);
+    color: #fff; font-size: 13px; font-weight: 600; pointer-events: all;
+  }
+  #attack-btn:active { background: rgba(255,60,60,0.8); }
+
+  #dodge-btn {
+    position: absolute; right: 118px; bottom: 20px; width: 58px; height: 58px; border-radius: 50%;
+    background: rgba(60,120,255,0.5); border: 2px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 11px; font-weight: 600; pointer-events: all;
+  }
+
+  #top-bar {
+    position: absolute; top: 16px; left: 16px; right: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #health-wrap { width: 140px; }
+  #health-label { color: #ccc; font-size: 10px; letter-spacing: 1px; margin-bottom: 3px; }
+  #health-bar-bg { width: 100%; height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; }
+  #health-bar { width: 100%; height: 100%; background: linear-gradient(90deg,#e33,#f66); transition: width 0.25s; }
+
+  #prompt {
+    position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 12px; background: rgba(0,0,0,0.4); padding: 6px 14px;
+    border-radius: 12px; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
+  }
+
+  #quest-banner {
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    color: #eaf6ff; font-size: 12px; letter-spacing: 0.5px; text-align: center;
+    background: rgba(10,20,30,0.55); border: 1px solid rgba(120,180,255,0.35);
+    padding: 8px 16px; border-radius: 10px; opacity: 0; transition: opacity 0.5s;
+    max-width: 260px;
+  }
+  #quest-title { font-size: 10px; color: #8fc8ff; letter-spacing: 1.5px; margin-bottom: 2px; }
+
+  #zone-flash {
+    position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none;
+    z-index: 90; transition: opacity 0.4s;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game-canvas"></canvas>
+
+<div id="cutscene">
+  <p id="cutscene-text">The old world sleeps beneath the ash-grey hills...</p>
+</div>
+<button id="skip-btn">Skip ▶</button>
+
+<div id="hud">
+  <div id="top-bar">
+    <div id="health-wrap">
+      <div id="health-label">HEALTH</div>
+      <div id="health-bar-bg"><div id="health-bar"></div></div>
+    </div>
+  </div>
+  <div id="prompt">Walk into the glowing shrine</div>
+  <div id="quest-banner"><div id="quest-title">QUEST</div><div id="quest-text"></div></div>
+  <div id="joystick-zone">
+    <div id="joystick-base"></div>
+    <div id="joystick-knob"></div>
+  </div>
+  <button id="dodge-btn">DODGE</button>
+  <button id="attack-btn">ATTACK</button>
+</div>
+
+<div id="zone-flash"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================================
+   WARDEN — Open-World 3D Adventure Starter
+   Engine: Three.js r128 (CDN, no build step — edit this file directly and
+   push via GitHub's web uploader; Vercel deploys automatically).
+
+   THIS IS A STARTER, NOT A FINISHED GAME. It gives you:
+   - An open outdoor 3D area (expandable — this is your "open world" seed)
+   - A player character (placeholder capsule) with WASD/touch movement
+   - Third-person camera that follows and orbits
+   - Attack + dodge actions with simple animation via code (no mocap yet)
+   - A scripted intro "cutscene" (camera pan + text) — this is how real
+     cinematics get built without a timeline editor: move the camera and
+     trigger animations via code, on a schedule
+   - A basic enemy with simple AI (chases, can be hit)
+   - A shrine-driven quest: walk up to it, clear 3 shades, and it opens a
+     glowing portal
+   - A SECOND zone ("The Ashen Ruins") reachable through that portal, with
+     its own terrain, obstacles, and tougher enemies — plus a return portal.
+     This is your "open world" pattern: each new area is its own group
+     (ground + obstacles + enemies + a portal), toggled visible on teleport.
+     Copy the zone2 block further down to add a zone3.
+
+   HOW TO ADD REAL MOTION-CAPTURE ANIMATION LATER:
+   1. Go to mixamo.com (free, Adobe account) on a desktop browser
+   2. Pick a character model, download animations (walk, run, attack, idle)
+      as .glb/.fbx
+   3. Add the GLTFLoader script (see commented import below) and load the
+      .glb instead of the capsule mesh — Mixamo animations plug into
+      Three.js's AnimationMixer directly
+   4. This step needs a one-time desktop session to export the files, but
+      after that, everything is edited/deployed the same phone-first way
+   ========================================================================= */
+
+// --- Renderer / Scene / Camera ---------------------------------------------
+const canvas = document.getElementById('game-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e14);
+scene.fog = new THREE.Fog(0x0a0e14, 20, 90);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+
+// --- Lighting ---------------------------------------------------------------
+const ambient = new THREE.AmbientLight(0x445566, 0.9);
+scene.add(ambient);
+const moon = new THREE.DirectionalLight(0xaabbff, 1.1);
+moon.position.set(-20, 30, -10);
+moon.castShadow = true;
+moon.shadow.mapSize.set(2048, 2048);
+moon.shadow.camera.left = -40; moon.shadow.camera.right = 40;
+moon.shadow.camera.top = 40; moon.shadow.camera.bottom = -40;
+scene.add(moon);
+
+// --- Zone system --------------------------------------------------------------
+// Two zones live side by side in the scene graph, in their own groups, so you
+// can toggle visibility instantly on "teleport" instead of rebuilding meshes.
+// Add a zone3 later the same way: new group, own ground/obstacles/enemies,
+// linked in by a portal pair.
+const zone1 = new THREE.Group();
+const zone2 = new THREE.Group();
+scene.add(zone1, zone2);
+
+function makePortal(color) {
+  const g = new THREE.Group();
+  const ringMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.4 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.18, 12, 24), ringMat);
+  ring.position.y = 1.8;
+  g.add(ring);
+  const light = new THREE.PointLight(color, 2.5, 10);
+  light.position.y = 1.8;
+  g.add(light);
+  g.userData = { ring };
+  return g;
+}
+
+// --- ZONE 1: The Hills (starting area) ----------------------------------------
+const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a3428, roughness: 1 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+zone1.add(ground);
+
+// Scatter some rocks/obstacles so the world feels populated
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x555f5a, roughness: 0.9 });
+const obstacles = [];
+for (let i = 0; i < 18; i++) {
+  const size = 0.6 + Math.random() * 1.6;
+  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 0), rockMat);
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 8 + Math.random() * 35;
+  rock.position.set(Math.cos(angle) * dist, size * 0.4, Math.sin(angle) * dist);
+  rock.rotation.set(Math.random(), Math.random(), Math.random());
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  zone1.add(rock);
+  obstacles.push({ mesh: rock, radius: size });
+}
+
+// --- Shrine (quest trigger — starts dormant, drives the whole quest state) ---
+const shrineGeo = new THREE.OctahedronGeometry(1.1, 0);
+const shrineMat = new THREE.MeshStandardMaterial({ color: 0x557799, emissive: 0x223344, emissiveIntensity: 0.5 });
+const shrine = new THREE.Mesh(shrineGeo, shrineMat);
+shrine.position.set(14, 1.4, -10);
+zone1.add(shrine);
+const shrineLight = new THREE.PointLight(0x557799, 1, 12);
+shrineLight.position.copy(shrine.position);
+zone1.add(shrineLight);
+
+// Portal in zone 1 — hidden until the quest is complete
+const portalToZone2 = makePortal(0x66ccff);
+portalToZone2.position.set(22, 0, -10);
+portalToZone2.visible = false;
+zone1.add(portalToZone2);
+
+// --- ZONE 2: The Ashen Ruins (unlocked after the shrine quest) ---------------
+const ground2Geo = new THREE.PlaneGeometry(160, 160, 30, 30);
+const ground2Mat = new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: 1 });
+const ground2 = new THREE.Mesh(ground2Geo, ground2Mat);
+ground2.rotation.x = -Math.PI / 2;
+ground2.receiveShadow = true;
+zone2.add(ground2);
+
+// Ruined pillars instead of rocks, so the zone reads as a distinct place
+const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6b5f52, roughness: 0.85 });
+const obstacles2 = [];
+for (let i = 0; i < 14; i++) {
+  const h = 2 + Math.random() * 3;
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, h, 8), pillarMat);
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 6 + Math.random() * 30;
+  pillar.position.set(Math.cos(angle) * dist, h / 2, Math.sin(angle) * dist);
+  pillar.rotation.z = (Math.random() - 0.5) * 0.3;
+  pillar.castShadow = true;
+  pillar.receiveShadow = true;
+  zone2.add(pillar);
+  obstacles2.push({ mesh: pillar, radius: 0.8 });
+}
+
+const portalToZone1 = makePortal(0xff9944);
+portalToZone1.position.set(0, 0, 8);
+zone2.add(portalToZone1);
+zone2.visible = false; // zone 2 starts hidden — revealed on first teleport
+
+// --- Player (placeholder — swap for a Mixamo GLTF model later) -------------
+const player = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc9a876, roughness: 0.6 });
+const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.1, 4, 8), bodyMat);
+body.position.y = 1.05;
+body.castShadow = true;
+player.add(body);
+
+// A simple "sword" so attacks read visually
+const swordGroup = new THREE.Group();
+const swordMat = new THREE.MeshStandardMaterial({ color: 0xdddde0, metalness: 0.7, roughness: 0.3 });
+const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.18), swordMat);
+blade.position.set(0.55, 1.1, 0.3);
+blade.rotation.z = -0.3;
+swordGroup.add(blade);
+player.add(swordGroup);
+
+player.position.set(0, 0, 5);
+scene.add(player);
+
+// --- Enemy (simple chase AI) -------------------------------------------------
+function makeEnemy(x, z, parentGroup, hp, color, scale) {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.5 * scale, 1.0 * scale, 4, 8),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
+  );
+  m.position.y = 1.0 * scale;
+  m.castShadow = true;
+  g.add(m);
+  g.position.set(x, 0, z);
+  g.userData = { hp, maxHp: hp, state: 'idle', hitCooldown: 0 };
+  parentGroup.add(g);
+  return g;
+}
+// Zone 1 enemies — the shrine quest requires clearing these
+const enemies1 = [
+  makeEnemy(-10, -8, zone1, 3, 0x8a2a2a, 1),
+  makeEnemy(18, 6, zone1, 3, 0x8a2a2a, 1),
+  makeEnemy(-16, 15, zone1, 3, 0x8a2a2a, 1)
+];
+// Zone 2 enemies — tougher, larger, a step up in difficulty
+const enemies2 = [
+  makeEnemy(10, -12, zone2, 6, 0x4a1a4a, 1.4),
+  makeEnemy(-14, 10, zone2, 6, 0x4a1a4a, 1.4)
+];
+
+// --- Quest / game state ---------------------------------------------------------
+const gameState = { currentZone: 1, questStage: 0 };
+// questStage: 0 = not started, 1 = active (clear enemies), 2 = complete (portal open)
+const questTitleEl = document.getElementById('quest-banner');
+const questTextEl = document.getElementById('quest-text');
+function setQuest(msg) {
+  if (msg) { questTextEl.textContent = msg; questTitleEl.style.opacity = '1'; }
+  else { questTitleEl.style.opacity = '0'; }
+}
+
+// --- Input: virtual joystick -------------------------------------------------
+const joystickZone = document.getElementById('joystick-zone');
+const joystickKnob = document.getElementById('joystick-knob');
+let joyActive = false, joyStartX = 0, joyStartY = 0, joyVec = { x: 0, y: 0 };
+
+function joyPointerDown(e) {
+  joyActive = true;
+  const t = e.touches ? e.touches[0] : e;
+  joyStartX = t.clientX; joyStartY = t.clientY;
+}
+function joyPointerMove(e) {
+  if (!joyActive) return;
+  const t = e.touches ? e.touches[0] : e;
+  let dx = t.clientX - joyStartX, dy = t.clientY - joyStartY;
+  const max = 45;
+  const len = Math.hypot(dx, dy);
+  if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+  joystickKnob.style.left = (35 + dx) + 'px';
+  joystickKnob.style.top = (35 + dy) + 'px';
+  joyVec.x = dx / max; joyVec.y = dy / max;
+}
+function joyPointerUp() {
+  joyActive = false; joyVec.x = 0; joyVec.y = 0;
+  joystickKnob.style.left = '35px'; joystickKnob.style.top = '35px';
+}
+joystickZone.addEventListener('touchstart', joyPointerDown, { passive: true });
+joystickZone.addEventListener('touchmove', joyPointerMove, { passive: true });
+joystickZone.addEventListener('touchend', joyPointerUp);
+joystickZone.addEventListener('mousedown', joyPointerDown);
+window.addEventListener('mousemove', joyPointerMove);
+window.addEventListener('mouseup', joyPointerUp);
+
+// Keyboard fallback (desktop testing)
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// --- Attack / Dodge buttons ---------------------------------------------------
+let attackTimer = 0, dodgeTimer = 0, dodgeCooldown = 0;
+document.getElementById('attack-btn').addEventListener('touchstart', doAttack, { passive: true });
+document.getElementById('attack-btn').addEventListener('mousedown', doAttack);
+document.getElementById('dodge-btn').addEventListener('touchstart', doDodge, { passive: true });
+document.getElementById('dodge-btn').addEventListener('mousedown', doDodge);
+window.addEventListener('keydown', e => { if (e.key === ' ') doAttack(); if (e.key.toLowerCase() === 'shift') doDodge(); });
+
+function doAttack() {
+  if (attackTimer > 0) return;
+  attackTimer = 0.4; // simple swing animation window
+}
+function doDodge() {
+  if (dodgeCooldown > 0 || dodgeTimer > 0) return;
+  dodgeTimer = 0.3;
+  dodgeCooldown = 1.0;
+}
+
+// --- Camera follow state -----------------------------------------------------
+let camYaw = 0;
+const camDist = 6.5, camHeight = 3.2;
+
+// --- Cutscene intro ------------------------------------------------------------
+const cutsceneLines = [
+  "The old world sleeps beneath the ash-grey hills...",
+  "Something ancient still watches from the ruins.",
+  "It is time to wake it."
+];
+let cutscenePlaying = true;
+let cutsceneStep = 0, cutsceneTimer = 0;
+const cutsceneEl = document.getElementById('cutscene');
+const cutsceneText = document.getElementById('cutscene-text');
+camera.position.set(0, 14, 30);
+camera.lookAt(0, 0, 0);
+
+function advanceCutscene() {
+  cutsceneStep++;
+  if (cutsceneStep >= cutsceneLines.length) { endCutscene(); return; }
+  cutsceneText.textContent = cutsceneLines[cutsceneStep];
+  cutsceneText.style.animation = 'none';
+  void cutsceneText.offsetWidth;
+  cutsceneText.style.animation = 'fadeIn 2s ease forwards';
+  cutsceneTimer = 0;
+}
+function endCutscene() {
+  cutscenePlaying = false;
+  cutsceneEl.style.opacity = '0';
+  setTimeout(() => cutsceneEl.style.display = 'none', 1200);
+  document.getElementById('skip-btn').style.display = 'none';
+}
+document.getElementById('skip-btn').addEventListener('click', endCutscene);
+document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
+
+// --- Health / prompt HUD -----------------------------------------------------
+let playerHP = 100;
+const healthBar = document.getElementById('health-bar');
+const promptEl = document.getElementById('prompt');
+function setPrompt(msg) {
+  if (msg) { promptEl.textContent = msg; promptEl.style.opacity = '1'; }
+  else { promptEl.style.opacity = '0'; }
+}
+
+// --- Main loop -----------------------------------------------------------------
+const clock = new THREE.Clock();
+const moveSpeed = 5.0;
+const playerVel = new THREE.Vector3();
+
+function checkObstacleCollision(nextPos) {
+  const list = gameState.currentZone === 1 ? obstacles : obstacles2;
+  for (const o of list) {
+    const dx = nextPos.x - o.mesh.position.x, dz = nextPos.z - o.mesh.position.z;
+    if (Math.hypot(dx, dz) < o.radius + 0.6) return true;
+  }
+  return false;
+}
+
+function teleportToZone(zoneNum) {
+  const zoneFlash = document.getElementById('zone-flash');
+  zoneFlash.style.opacity = '1';
+  setTimeout(() => {
+    gameState.currentZone = zoneNum;
+    if (zoneNum === 2) {
+      zone1.visible = false; zone2.visible = true;
+      player.position.set(portalToZone1.position.x, 0, portalToZone1.position.z - 3);
+      setQuest('Defeat the ruin-wardens to find a way back');
+    } else {
+      zone1.visible = true; zone2.visible = false;
+      player.position.set(portalToZone2.position.x - 3, 0, portalToZone2.position.z);
+      setQuest('');
+    }
+    zoneFlash.style.opacity = '0';
+  }, 380);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // --- Cutscene camera pan ---
+  if (cutscenePlaying) {
+    cutsceneTimer += dt;
+    const angle = clock.elapsedTime * 0.08;
+    camera.position.x = Math.sin(angle) * 30;
+    camera.position.z = Math.cos(angle) * 30;
+    camera.position.y = 14;
+    camera.lookAt(0, 1, 0);
+    if (cutsceneTimer > 3.2) advanceCutscene();
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // --- Movement input (joystick or keyboard) ---
+  let ix = joyVec.x, iy = joyVec.y;
+  if (keys['w'] || keys['arrowup']) iy = -1;
+  if (keys['s'] || keys['arrowdown']) iy = 1;
+  if (keys['a'] || keys['arrowleft']) ix = -1;
+  if (keys['d'] || keys['arrowright']) ix = 1;
+
+  const moving = Math.hypot(ix, iy) > 0.08;
+  if (moving) {
+    const targetAngle = Math.atan2(ix, -iy) + camYaw;
+    player.rotation.y += (targetAngle - player.rotation.y) * 0.2;
+    const speed = dodgeTimer > 0 ? moveSpeed * 3 : moveSpeed;
+    playerVel.set(Math.sin(targetAngle) * speed * dt, 0, Math.cos(targetAngle) * speed * dt);
+    const next = player.position.clone().add(playerVel);
+    next.x = Math.max(-95, Math.min(95, next.x));
+    next.z = Math.max(-95, Math.min(95, next.z));
+    if (!checkObstacleCollision(next)) player.position.copy(next);
+  }
+
+  // bob animation while moving
+  body.position.y = 1.05 + (moving ? Math.sin(clock.elapsedTime * 10) * 0.05 : 0);
+
+  // --- Attack animation (sword swing) ---
+  if (attackTimer > 0) {
+    attackTimer -= dt;
+    const t = 1 - attackTimer / 0.4;
+    swordGroup.rotation.y = Math.sin(t * Math.PI) * 2.2;
+  } else {
+    swordGroup.rotation.y *= 0.8;
+  }
+  if (dodgeTimer > 0) dodgeTimer -= dt;
+  if (dodgeCooldown > 0) dodgeCooldown -= dt;
+
+  // --- Enemy AI: chase + simple combat (active zone only) ---
+  const activeEnemies = gameState.currentZone === 1 ? enemies1 : enemies2;
+  activeEnemies.forEach(en => {
+    if (en.userData.hp <= 0) { en.visible = false; return; }
+    const dist = en.position.distanceTo(player.position);
+    if (dist < 20) {
+      const dir = player.position.clone().sub(en.position).normalize();
+      if (dist > 1.4) {
+        en.position.addScaledVector(dir, 2.2 * dt);
+        en.rotation.y = Math.atan2(dir.x, dir.z);
+      } else if (en.userData.hitCooldown <= 0) {
+        playerHP = Math.max(0, playerHP - 8);
+        healthBar.style.width = playerHP + '%';
+        en.userData.hitCooldown = 1.0;
+      }
+    }
+    if (en.userData.hitCooldown > 0) en.userData.hitCooldown -= dt;
+
+    // player attack hits nearby enemy
+    if (attackTimer > 0.15 && attackTimer < 0.3 && dist < 2.2) {
+      en.userData.hp -= 1;
+      en.userData.hitCooldown = 0.5;
+    }
+  });
+
+  // --- Shrine / quest progression (zone 1 only) ---
+  if (gameState.currentZone === 1) {
+    let nearShrine = player.position.distanceTo(shrine.position) < 3;
+
+    if (gameState.questStage === 0 && nearShrine) {
+      gameState.questStage = 1;
+      shrineMat.color.set(0x66ccff);
+      shrineMat.emissive.set(0x2288ff);
+      shrineMat.emissiveIntensity = 1.2;
+      shrineLight.color.set(0x66ccff);
+      shrineLight.intensity = 2;
+      setQuest('Defeat the 3 shades roaming the hills');
+    }
+
+    if (gameState.questStage === 1) {
+      const remaining = enemies1.filter(e => e.userData.hp > 0).length;
+      setQuest(`Defeat the shades — ${remaining} remaining`);
+      if (remaining === 0) {
+        gameState.questStage = 2;
+        portalToZone2.visible = true;
+        setQuest('Shrine awakened — a portal has opened to the east');
+      }
+    }
+
+    if (gameState.questStage === 2) {
+      setPrompt(nearShrine ? 'Shrine awakened' : '');
+    } else {
+      setPrompt('');
+    }
+
+    shrine.rotation.y += dt * 1.5;
+    shrine.position.y = 1.4 + Math.sin(clock.elapsedTime * 2) * 0.15;
+  }
+
+  // --- Portal teleport check ---
+  if (gameState.currentZone === 1 && portalToZone2.visible) {
+    portalToZone2.userData.ring.rotation.z += dt;
+    if (player.position.distanceTo(portalToZone2.position) < 2.2) teleportToZone(2);
+  }
+  if (gameState.currentZone === 2) {
+    portalToZone1.userData.ring.rotation.z += dt;
+    if (player.position.distanceTo(portalToZone1.position) < 2.2) teleportToZone(1);
+  }
+
+  // --- Camera follow (orbit slightly behind player facing) ---
+  const behind = new THREE.Vector3(
+    Math.sin(player.rotation.y) * -camDist,
+    camHeight,
+    Math.cos(player.rotation.y) * -camDist
+  );
+  const desiredCamPos = player.position.clone().add(behind);
+  camera.position.lerp(desiredCamPos, 0.12);
+  camera.lookAt(player.position.x, player.position.y + 1.3, player.position.z);
+  camYaw = player.rotation.y;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
