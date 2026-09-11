@@ -81,6 +81,15 @@
     position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none;
     z-index: 90; transition: opacity 0.4s;
   }
+  #brand { position:absolute; top:16px; left:50%; transform:translateX(-50%); color:#eaf6ff; font-size:18px; letter-spacing:5px; font-weight:700; text-shadow:0 0 18px #66ccff; }
+  #status { position:absolute; top:62px; right:16px; color:#b9c7d4; font-size:10px; letter-spacing:1px; text-align:right; }
+  #health-value { color:#fff; font-size:11px; margin-top:4px; text-align:right; }
+  #action-status { position:absolute; right:16px; bottom:124px; color:#b9c7d4; font-size:10px; letter-spacing:1px; text-align:right; }
+  #game-over { position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:rgba(3,6,12,.86); color:#fff; text-align:center; }
+  #game-over h1 { color:#ff8f8f; letter-spacing:4px; font-size:26px; }
+  #game-over p { color:#b9c7d4; font-size:13px; }
+  #restart-btn { pointer-events:all; border:1px solid #7abfff; border-radius:20px; padding:10px 20px; color:#eaf6ff; background:#17304a; }
+  @media (min-width:700px) { #joystick-zone,#attack-btn,#dodge-btn { opacity:.45; } #joystick-zone { left:32px; bottom:32px; } #attack-btn { right:36px; } #dodge-btn { right:130px; } }
 </style>
 </head>
 <body>
@@ -97,8 +106,12 @@
     <div id="health-wrap">
       <div id="health-label">HEALTH</div>
       <div id="health-bar-bg"><div id="health-bar"></div></div>
+      <div id="health-value">100 / 100</div>
     </div>
   </div>
+  <div id="brand">WARDEN</div>
+  <div id="status">THE HILLS<br><span id="objective">AWAITING SHRINE</span></div>
+  <div id="action-status">SPACE ATTACK · SHIFT DODGE</div>
   <div id="prompt">Walk into the glowing shrine</div>
   <div id="quest-banner"><div id="quest-title">QUEST</div><div id="quest-text"></div></div>
   <div id="joystick-zone">
@@ -110,6 +123,7 @@
 </div>
 
 <div id="zone-flash"></div>
+<div id="game-over"><h1 id="game-over-title">WARDEN FALLEN</h1><p id="game-over-copy">The hills wait in silence.</p><button id="restart-btn">RESTART JOURNEY</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -292,7 +306,7 @@ function makeEnemy(x, z, parentGroup, hp, color, scale) {
   m.castShadow = true;
   g.add(m);
   g.position.set(x, 0, z);
-  g.userData = { hp, maxHp: hp, state: 'idle', hitCooldown: 0 };
+  g.userData = { hp, maxHp: hp, state: 'idle', hitCooldown: 0, attackTagged: false, flash: 0 };
   parentGroup.add(g);
   return g;
 }
@@ -309,7 +323,7 @@ const enemies2 = [
 ];
 
 // --- Quest / game state ---------------------------------------------------------
-const gameState = { currentZone: 1, questStage: 0 };
+const gameState = { currentZone: 1, questStage: 0, ended: false, portalLock: 0, hitFlash: 0, introHint: true };
 // questStage: 0 = not started, 1 = active (clear enemies), 2 = complete (portal open)
 const questTitleEl = document.getElementById('quest-banner');
 const questTextEl = document.getElementById('quest-text');
@@ -364,8 +378,9 @@ document.getElementById('dodge-btn').addEventListener('mousedown', doDodge);
 window.addEventListener('keydown', e => { if (e.key === ' ') doAttack(); if (e.key.toLowerCase() === 'shift') doDodge(); });
 
 function doAttack() {
-  if (attackTimer > 0) return;
-  attackTimer = 0.4; // simple swing animation window
+  if (attackTimer > 0 || gameState.ended || cutscenePlaying) return;
+  attackTimer = 0.4;
+  enemies1.concat(enemies2).forEach(en => en.userData.attackTagged = false);
 }
 function doDodge() {
   if (dodgeCooldown > 0 || dodgeTimer > 0) return;
@@ -403,14 +418,25 @@ function endCutscene() {
   cutscenePlaying = false;
   cutsceneEl.style.opacity = '0';
   setTimeout(() => cutsceneEl.style.display = 'none', 1200);
+  setQuest('Find the glowing shrine to awaken the ward');
+  setTimeout(() => { if (gameState.questStage === 0) setQuest('Find the glowing shrine to awaken the ward'); }, 700);
   document.getElementById('skip-btn').style.display = 'none';
 }
 document.getElementById('skip-btn').addEventListener('click', endCutscene);
 document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
+document.getElementById('restart-btn').addEventListener('click', resetGame);
 
 // --- Health / prompt HUD -----------------------------------------------------
 let playerHP = 100;
+const maxPlayerHP = 100;
+const healthValue = document.getElementById('health-value');
+const objectiveEl = document.getElementById('objective');
 const healthBar = document.getElementById('health-bar');
+const gameOverEl = document.getElementById('game-over');
+function updateHealth() { healthBar.style.width = playerHP + '%'; healthValue.textContent = playerHP + ' / ' + maxPlayerHP; }
+function damagePlayer(amount) { if (dodgeTimer > 0 || gameState.ended) return; playerHP = Math.max(0, playerHP - amount); gameState.hitFlash = 0.18; updateHealth(); if (playerHP === 0) endGame(false); }
+function endGame(won) { gameState.ended = true; gameOverEl.style.display = 'flex'; document.getElementById('game-over-title').textContent = won ? 'JOURNEY COMPLETE' : 'WARDEN FALLEN'; document.getElementById('game-over-copy').textContent = won ? 'The ruins are quiet. The path is yours.' : 'The shades reclaimed the hills.'; }
+function resetGame() { window.location.reload(); }
 const promptEl = document.getElementById('prompt');
 function setPrompt(msg) {
   if (msg) { promptEl.textContent = msg; promptEl.style.opacity = '1'; }
@@ -421,6 +447,7 @@ function setPrompt(msg) {
 const clock = new THREE.Clock();
 const moveSpeed = 5.0;
 const playerVel = new THREE.Vector3();
+updateHealth();
 
 function checkObstacleCollision(nextPos) {
   const list = gameState.currentZone === 1 ? obstacles : obstacles2;
@@ -440,6 +467,7 @@ function teleportToZone(zoneNum) {
       zone1.visible = false; zone2.visible = true;
       player.position.set(portalToZone1.position.x, 0, portalToZone1.position.z - 3);
       setQuest('Defeat the ruin-wardens to find a way back');
+      objectiveEl.textContent = 'RUIN-WARDENS REMAIN';
     } else {
       zone1.visible = true; zone2.visible = false;
       player.position.set(portalToZone2.position.x - 3, 0, portalToZone2.position.z);
@@ -452,6 +480,8 @@ function teleportToZone(zoneNum) {
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (gameState.hitFlash > 0) { gameState.hitFlash -= dt; canvas.style.filter = 'brightness(1.7) saturate(1.4)'; } else canvas.style.filter = '';
+  if (gameState.portalLock > 0) gameState.portalLock -= dt;
 
   // --- Cutscene camera pan ---
   if (cutscenePlaying) {
@@ -510,18 +540,21 @@ function animate() {
         en.position.addScaledVector(dir, 2.2 * dt);
         en.rotation.y = Math.atan2(dir.x, dir.z);
       } else if (en.userData.hitCooldown <= 0) {
-        playerHP = Math.max(0, playerHP - 8);
-        healthBar.style.width = playerHP + '%';
+        damagePlayer(8);
         en.userData.hitCooldown = 1.0;
       }
     }
     if (en.userData.hitCooldown > 0) en.userData.hitCooldown -= dt;
 
     // player attack hits nearby enemy
-    if (attackTimer > 0.15 && attackTimer < 0.3 && dist < 2.2) {
+    if (attackTimer > 0.15 && attackTimer < 0.3 && dist < 2.2 && !en.userData.attackTagged) {
       en.userData.hp -= 1;
-      en.userData.hitCooldown = 0.5;
+      en.userData.attackTagged = true;
+      en.userData.flash = 0.12;
+      en.scale.setScalar(1.12);
+      if (en.userData.hp <= 0) { en.visible = false; setQuest('Shade defeated'); setTimeout(() => setQuest(''), 700); }
     }
+    if (en.userData.flash > 0) { en.userData.flash -= dt; en.children[0].material.emissive.set(0xffffff); en.children[0].material.emissiveIntensity = 1.5; } else { en.children[0].material.emissive.set(0x000000); en.children[0].material.emissiveIntensity = 0; en.scale.lerp(new THREE.Vector3(1,1,1), 0.2); }
   });
 
   // --- Shrine / quest progression (zone 1 only) ---
@@ -541,10 +574,12 @@ function animate() {
     if (gameState.questStage === 1) {
       const remaining = enemies1.filter(e => e.userData.hp > 0).length;
       setQuest(`Defeat the shades — ${remaining} remaining`);
+      objectiveEl.textContent = remaining + ' SHADES REMAIN';
       if (remaining === 0) {
         gameState.questStage = 2;
         portalToZone2.visible = true;
         setQuest('Shrine awakened — a portal has opened to the east');
+        objectiveEl.textContent = 'PORTAL OPEN';
       }
     }
 
@@ -561,11 +596,11 @@ function animate() {
   // --- Portal teleport check ---
   if (gameState.currentZone === 1 && portalToZone2.visible) {
     portalToZone2.userData.ring.rotation.z += dt;
-    if (player.position.distanceTo(portalToZone2.position) < 2.2) teleportToZone(2);
+    if (gameState.portalLock <= 0 && player.position.distanceTo(portalToZone2.position) < 2.2) { gameState.portalLock = 1.5; teleportToZone(2); }
   }
   if (gameState.currentZone === 2) {
     portalToZone1.userData.ring.rotation.z += dt;
-    if (player.position.distanceTo(portalToZone1.position) < 2.2) teleportToZone(1);
+    if (gameState.portalLock <= 0 && player.position.distanceTo(portalToZone1.position) < 2.2) { gameState.portalLock = 1.5; teleportToZone(1); }
   }
 
   // --- Camera follow (orbit slightly behind player facing) ---
