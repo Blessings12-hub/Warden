@@ -323,7 +323,7 @@ const enemies2 = [
 ];
 
 // --- Quest / game state ---------------------------------------------------------
-const gameState = { currentZone: 1, questStage: 0, ended: false, portalLock: 0, hitFlash: 0, introHint: true };
+const gameState = { currentZone: 1, questStage: 0, zone2Complete: false, ended: false, portalLock: 0, hitFlash: 0, introHint: true };
 // questStage: 0 = not started, 1 = active (clear enemies), 2 = complete (portal open)
 const questTitleEl = document.getElementById('quest-banner');
 const questTextEl = document.getElementById('quest-text');
@@ -371,11 +371,9 @@ window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
 // --- Attack / Dodge buttons ---------------------------------------------------
 let attackTimer = 0, dodgeTimer = 0, dodgeCooldown = 0;
-document.getElementById('attack-btn').addEventListener('touchstart', doAttack, { passive: true });
-document.getElementById('attack-btn').addEventListener('mousedown', doAttack);
-document.getElementById('dodge-btn').addEventListener('touchstart', doDodge, { passive: true });
-document.getElementById('dodge-btn').addEventListener('mousedown', doDodge);
-window.addEventListener('keydown', e => { if (e.key === ' ') doAttack(); if (e.key.toLowerCase() === 'shift') doDodge(); });
+document.getElementById('attack-btn').addEventListener('pointerdown', e => { e.preventDefault(); doAttack(); });
+document.getElementById('dodge-btn').addEventListener('pointerdown', e => { e.preventDefault(); doDodge(); });
+window.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); doAttack(); } if (e.key.toLowerCase() === 'shift') doDodge(); });
 
 function doAttack() {
   if (attackTimer > 0 || gameState.ended || cutscenePlaying) return;
@@ -556,6 +554,21 @@ function animate() {
     }
     if (en.userData.flash > 0) { en.userData.flash -= dt; en.children[0].material.emissive.set(0xffffff); en.children[0].material.emissiveIntensity = 1.5; } else { en.children[0].material.emissive.set(0x000000); en.children[0].material.emissiveIntensity = 0; en.scale.lerp(new THREE.Vector3(1,1,1), 0.2); }
   });
+
+  // --- Zone objectives and shrine progression ---
+  if (gameState.currentZone === 2) {
+    const remaining = enemies2.filter(e => e.userData.hp > 0).length;
+    if (!gameState.zone2Complete) {
+      setQuest(`Defeat the ruin-wardens — ${remaining} remaining`);
+      objectiveEl.textContent = remaining + ' WARDENS REMAIN';
+      if (remaining === 0) {
+        gameState.zone2Complete = true;
+        setQuest('The ruins are quiet — journey complete');
+        objectiveEl.textContent = 'JOURNEY COMPLETE';
+        setTimeout(() => endGame(true), 650);
+      }
+    }
+  }
 
   // --- Shrine / quest progression (zone 1 only) ---
   if (gameState.currentZone === 1) {
