@@ -35,12 +35,17 @@
   #start-btn:active { transform: scale(.97); background: #24557a; }
   #cutscene-content { display:flex; flex-direction:column; align-items:center; }
   #load-error { display:none; max-width:300px; color:#ffc4b8; font-size:13px; line-height:1.5; text-align:center; }
-  #rotate-prompt { display:none; position:fixed; inset:0; z-index:130; align-items:center; justify-content:center; background:linear-gradient(145deg,#030811,#0b1b2c); color:#eaf6ff; text-align:center; padding:28px; }
-  #rotate-prompt .rotate-card { max-width:290px; }
-  #rotate-prompt .rotate-icon { font-size:48px; margin-bottom:18px; color:#8fd0ff; transform:rotate(-18deg); }
-  #rotate-prompt h2 { font-size:16px; letter-spacing:2px; margin-bottom:10px; }
-  #rotate-prompt p { color:#aebfd0; font-size:13px; line-height:1.5; }
-  @media (orientation: portrait) and (max-width: 700px) { #rotate-prompt { display:flex; } }
+  #rotate-prompt {
+    display:none; position:fixed; left:50%; top:16px; transform:translateX(-50%);
+    z-index:130; max-width:280px; text-align:center; padding:14px 18px;
+    background:rgba(6,14,24,0.92); border:1px solid rgba(143,200,255,.4);
+    border-radius:14px; color:#eaf6ff; pointer-events:all;
+  }
+  #rotate-prompt.show { display:block; }
+  #rotate-prompt .rotate-icon { font-size:20px; margin-bottom:4px; color:#8fd0ff; transform:rotate(-18deg); display:inline-block; }
+  #rotate-prompt h2 { font-size:11px; letter-spacing:1.5px; margin-bottom:4px; }
+  #rotate-prompt p { color:#aebfd0; font-size:11px; line-height:1.4; margin-bottom:8px; }
+  #rotate-dismiss { border:1px solid rgba(143,200,255,.55); border-radius:16px; padding:5px 14px; color:#eaf6ff; background:#16334f; font-size:11px; letter-spacing:.5px; }
   #nolu-nameplate { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#d9f3ff; font-size:10px; letter-spacing:2px; text-shadow:0 0 8px #2e9dcc; opacity:0; transition:opacity .3s; }
   #dialogue { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); width:min(440px,calc(100vw - 32px)); z-index:115; display:none; padding:14px; border:1px solid rgba(143,200,255,.5); border-radius:14px; background:rgba(5,12,22,.92); color:#eaf6ff; box-shadow:0 0 28px rgba(54,158,220,.18); pointer-events:all; }
   #dialogue strong { color:#8fd0ff; font-size:10px; letter-spacing:2px; }
@@ -136,7 +141,7 @@
   </div>
 </div>
 <button id="skip-btn" type="button">Skip ▶</button>
-<div id="rotate-prompt" role="status" aria-live="polite"><div class="rotate-card"><div class="rotate-icon" aria-hidden="true">↻</div><h2>LANDSCAPE MODE</h2><p>Turn your phone sideways for the best view of Nolu&apos;s journey.</p></div></div>
+<div id="rotate-prompt" role="status" aria-live="polite"><span class="rotate-icon" aria-hidden="true">↻</span><h2>TIP</h2><p>Playing in landscape gives a wider view — but portrait works fine too.</p><button id="rotate-dismiss" type="button">GOT IT</button></div>
   
 <div id="hud">
   <div id="top-bar">
@@ -180,11 +185,19 @@ function requestLandscapeMode() {
   var root = document.documentElement;
   var fullscreenRequest = root.requestFullscreen || root.webkitRequestFullscreen;
   if (fullscreenRequest && !document.fullscreenElement) {
-    try { fullscreenRequest.call(root); } catch (error) { /* fullscreen is optional */ }
+    try { fullscreenRequest.call(root); } catch (error) { /* fullscreen is optional, ignore if blocked */ }
   }
   var orientation = screen.orientation;
   if (orientation && orientation.lock) {
-    try { orientation.lock('landscape').catch(function () {}); } catch (error) { /* unsupported on some browsers */ }
+    try { orientation.lock('landscape').catch(function () {}); } catch (error) { /* unsupported on iOS Safari and others, ignore */ }
+  }
+  // Non-blocking tip only — never prevents play in portrait.
+  if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
+    var tip = document.getElementById('rotate-prompt');
+    if (tip) {
+      tip.classList.add('show');
+      setTimeout(function () { tip.classList.remove('show'); }, 5000);
+    }
   }
 }
 /* =========================================================================
@@ -524,6 +537,12 @@ document.getElementById('skip-btn').addEventListener('click', endCutscene);
 document.getElementById('start-btn').addEventListener('click', function () { requestLandscapeMode(); endCutscene(); });
  document.getElementById('start-btn').addEventListener('touchstart', function () { requestLandscapeMode(); endCutscene(); }, { passive: true });
   document.getElementById('restart-btn').addEventListener('click', resetGame);
+  var rotateDismiss = document.getElementById('rotate-dismiss');
+  if (rotateDismiss) {
+    var hideRotateTip = function () { document.getElementById('rotate-prompt').classList.remove('show'); };
+    rotateDismiss.addEventListener('click', hideRotateTip);
+    rotateDismiss.addEventListener('touchstart', hideRotateTip, { passive: true });
+  }
   if (typeof THREE === 'undefined') {
     document.getElementById('cutscene-text').style.display = 'none';
     document.getElementById('start-btn').style.display = 'none';
