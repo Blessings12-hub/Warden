@@ -26,6 +26,15 @@
     background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.3);
     padding: 8px 16px; border-radius: 20px; font-size: 13px; pointer-events: all;
   }
+  #start-btn {
+    margin-top: 22px; padding: 13px 25px; border: 1px solid rgba(143,200,255,.75);
+    border-radius: 24px; background: linear-gradient(135deg, rgba(44,91,130,.9), rgba(15,33,57,.95));
+    color: #f4fbff; font-size: 12px; font-weight: 700; letter-spacing: 1.8px;
+    pointer-events: all; box-shadow: 0 0 24px rgba(102,204,255,.2);
+  }
+  #start-btn:active { transform: scale(.97); background: #24557a; }
+  #cutscene-content { display:flex; flex-direction:column; align-items:center; }
+  #load-error { display:none; max-width:300px; color:#ffc4b8; font-size:13px; line-height:1.5; text-align:center; }
 
   #joystick-zone {
     position: absolute; left: 24px; bottom: 24px; width: 130px; height: 130px;
@@ -105,9 +114,13 @@
 <canvas id="game-canvas"></canvas>
 
 <div id="cutscene">
-  <p id="cutscene-text">The old world sleeps beneath the ash-grey hills...</p>
+  <div id="cutscene-content">
+    <p id="cutscene-text">The old world sleeps beneath the ash-grey hills...</p>
+    <button id="start-btn" type="button">START JOURNEY</button>
+    <p id="load-error">The 3D engine could not load. Check your connection and reload the page.</p>
+  </div>
 </div>
-<button id="skip-btn">Skip ▶</button>
+<button id="skip-btn" type="button">Skip ▶</button>
 
 <div id="hud">
   <div id="top-bar">
@@ -138,6 +151,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+// Bootstrap the intro controls before the 3D scene finishes loading.
+var cutscenePlaying = true;
+var cutsceneStep = 0, cutsceneTimer = 0;
+var cutsceneEl = document.getElementById('cutscene');
+var cutsceneText = document.getElementById('cutscene-text');
 /* =========================================================================
    WARDEN — Open-World 3D Adventure Starter
    Engine: Three.js r128 (CDN, no build step — edit this file directly and
@@ -435,10 +453,10 @@ const cutsceneLines = [
   "Something ancient still watches from the ruins.",
   "It is time to wake it."
 ];
-let cutscenePlaying = true;
-let cutsceneStep = 0, cutsceneTimer = 0;
-const cutsceneEl = document.getElementById('cutscene');
-const cutsceneText = document.getElementById('cutscene-text');
+  var cutscenePlaying = true;
+  var cutsceneStep = 0, cutsceneTimer = 0;
+  var cutsceneEl = document.getElementById('cutscene');
+  var cutsceneText = document.getElementById('cutscene-text');
 camera.position.set(0, 14, 30);
 camera.lookAt(0, 0, 0);
 
@@ -455,13 +473,25 @@ function endCutscene() {
   cutscenePlaying = false;
   cutsceneEl.style.opacity = '0';
   setTimeout(() => cutsceneEl.style.display = 'none', 1200);
-  setQuest('Find the glowing shrine to awaken the ward');
-  setTimeout(() => { if (gameState.questStage === 0) setQuest('Find the glowing shrine to awaken the ward'); }, 700);
+  const introQuestTitle = document.getElementById('quest-banner');
+  const introQuestText = document.getElementById('quest-text');
+  if (introQuestTitle && introQuestText) {
+    introQuestText.textContent = 'Find the glowing shrine to awaken the ward';
+    introQuestTitle.style.opacity = '1';
+  }
   document.getElementById('skip-btn').style.display = 'none';
 }
-document.getElementById('skip-btn').addEventListener('click', endCutscene);
-document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
-document.getElementById('restart-btn').addEventListener('click', resetGame);
+  document.getElementById('skip-btn').addEventListener('click', endCutscene);
+  document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
+  document.getElementById('start-btn').addEventListener('click', endCutscene);
+  document.getElementById('start-btn').addEventListener('touchstart', endCutscene, { passive: true });
+  document.getElementById('restart-btn').addEventListener('click', resetGame);
+  if (typeof THREE === 'undefined') {
+    document.getElementById('cutscene-text').style.display = 'none';
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('load-error').style.display = 'block';
+    document.getElementById('skip-btn').style.display = 'none';
+  }
 
 // --- Health / prompt HUD -----------------------------------------------------
 let playerHP = 100;

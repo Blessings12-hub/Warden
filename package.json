@@ -4,6 +4,7 @@
   "private": true,
   "description": "Phone-first open-world 3D adventure game starter (Three.js, no build step)",
   "scripts": {
-    "dev": "echo 'Static site — just open index.html in a browser, or run: npx serve .'"
+    "dev": "npx --yes serve .",
+    "start": "npx --yes serve ."
   }
 }
