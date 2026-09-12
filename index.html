@@ -213,7 +213,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-/* =========================================================================
+  /* =========================================================================
    WARDEN — Open-World 3D Adventure
    Engine: Three.js r128 (CDN, no build step — edit this file directly and
    push via GitHub's web uploader; Vercel deploys automatically).
@@ -520,11 +520,13 @@ const cloakMat = new THREE.MeshStandardMaterial({ color: 0x183c59, roughness: 0.
 const skinMat = new THREE.MeshStandardMaterial({ color: 0x9b674f, roughness: 0.62 });
 const trimMat = new THREE.MeshStandardMaterial({ color: 0x65d4e8, emissive: 0x0d5368, emissiveIntensity: .45, metalness: .35 });
 const hairMat = new THREE.MeshStandardMaterial({ color: 0x171423, roughness: .8 });
-const body = new THREE.Mesh(new THREE.CapsuleGeometry(.42, .82, 6, 12), cloakMat); body.position.y=1.05;
+// Three.js r128 does not include CapsuleGeometry; compose the cloak from primitives instead.
+const body = new THREE.Mesh(new THREE.CylinderGeometry(.42, .52, .82, 12), cloakMat); body.position.y=1.05;
+const bodyShoulders = new THREE.Mesh(new THREE.SphereGeometry(.43, 12, 8), cloakMat); bodyShoulders.scale.y = .72; bodyShoulders.position.y = 1.42;
 const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 16, 12), skinMat); head.position.y=1.82;
 const hair = new THREE.Mesh(new THREE.SphereGeometry(.38, 16, 12, 0, Math.PI*2, 0, Math.PI*.62), hairMat); hair.position.y=1.94;
 const sash = new THREE.Mesh(new THREE.TorusGeometry(.43,.045,8,20), trimMat); sash.rotation.x=Math.PI/2; sash.position.y=1.18;
-[body, head, hair, sash].forEach((m)=>{ m.castShadow=true; player.add(m); });
+[body, bodyShoulders, head, hair, sash].forEach((m)=>{ m.castShadow=true; player.add(m); });
 const swordGroup = new THREE.Group();
 const swordMat = new THREE.MeshStandardMaterial({ color: 0xb8f4ff, emissive: 0x2c9db9, emissiveIntensity: .55, metalness: .8, roughness: .2 });
 const blade = new THREE.Mesh(new THREE.BoxGeometry(.1,1.25,.16), swordMat); blade.position.set(.56,1.12,.3); blade.rotation.z=-.3; swordGroup.add(blade);
@@ -587,8 +589,8 @@ function updateParticles(dt) {
 function makeEnemy(x, z, parentGroup, hp, color, scale, kind) {
   const g = new THREE.Group();
   const m = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.5 * scale, 1.0 * scale, 4, 8),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
+  new THREE.CylinderGeometry(0.5 * scale, 0.62 * scale, 1.0 * scale, 10),
+  new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
   );
   m.position.y = 1.0 * scale;
   m.castShadow = true;
@@ -682,7 +684,7 @@ const questTextEl = document.getElementById('quest-text');
 function setQuest(msg) { if (msg) { questTextEl.textContent = msg; questTitleEl.style.opacity = '1'; } else { questTitleEl.style.opacity = '0'; } }
 
 // --- Synthesized audio (Web Audio API — no external files) --------------------
-const audio = (function () {
+var audio = (function () {
   let ctx = null, master = null, ambientNodes = null;
   function ensure() {
     if (ctx) return;
@@ -840,9 +842,12 @@ function endCutscene() {
   cutsceneEl.style.pointerEvents = 'none';
   cutsceneEl.style.opacity = '0';
   setTimeout(() => cutsceneEl.style.display = 'none', 1000);
-  audio.startAmbient();
-  setQuest('Find the glowing shrine to awaken the ward');
-  setTimeout(() => setQuest(''), 4200);
+  if (audio && typeof audio.startAmbient === 'function') audio.startAmbient();
+  const questBanner = document.getElementById('quest-banner');
+  const questText = document.getElementById('quest-text');
+  if (questText) questText.textContent = 'Find the glowing shrine to awaken the ward';
+  if (questBanner) questBanner.style.opacity = '1';
+  setTimeout(() => { if (questBanner) questBanner.style.opacity = '0'; }, 4200);
   const hint = document.getElementById('nolu-hint');
   if (hint) { hint.style.opacity = '1'; setTimeout(() => hint.style.opacity = '0', 7000); }
   dialogueTextEl.textContent = pickLine('intro');
@@ -937,25 +942,24 @@ function applySaveData(data) {
 
 const existingSave = loadSaveData();
 if (existingSave) document.getElementById('continue-btn').style.display = 'inline-block';
-document.getElementById('continue-btn').addEventListener('click', function () {
-  requestLandscapeMode(); endCutscene();
+// Use the native click path for every input device. A browser synthesizes click
+// for touch, so this avoids the old click + touchstart double-fire on mobile.
+function bindPrimaryAction(id, handler) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', function (event) {
+    event.preventDefault();
+    handler(event);
+  });
+}
+bindPrimaryAction('continue-btn', function () {
+  requestLandscapeMode();
   if (existingSave) applySaveData(existingSave);
+  endCutscene();
 });
-document.getElementById('continue-btn').addEventListener('touchstart', function () {
-  requestLandscapeMode(); endCutscene();
-  if (existingSave) applySaveData(existingSave);
-}, { passive: true });
-
-document.getElementById('skip-btn').addEventListener('click', endCutscene);
-document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
-document.getElementById('start-btn').addEventListener('click', function () { requestLandscapeMode(); endCutscene(); });
-document.getElementById('start-btn').addEventListener('touchstart', function () { requestLandscapeMode(); endCutscene(); }, { passive: true });
-(function () {
-  var rotateDismiss = document.getElementById('rotate-dismiss');
-  var hideRotateTip = function () { document.getElementById('rotate-prompt').classList.remove('show'); };
-  rotateDismiss.addEventListener('click', hideRotateTip);
-  rotateDismiss.addEventListener('touchstart', hideRotateTip, { passive: true });
-})();
+bindPrimaryAction('skip-btn', endCutscene);
+bindPrimaryAction('start-btn', function () { requestLandscapeMode(); endCutscene(); });
+bindPrimaryAction('rotate-dismiss', function () { document.getElementById('rotate-prompt').classList.remove('show'); });
 if (typeof THREE === 'undefined') {
   document.getElementById('cutscene-text').style.display = 'none';
   document.getElementById('start-btn').style.display = 'none';
