@@ -19,4 +19,4 @@ export default async function handler(request, response) {
   }
 }
 
-export const config = { runtime: 'nodejs20.x' }
+export const config = { runtime: 'nodejs' }
