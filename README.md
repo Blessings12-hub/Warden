@@ -15,24 +15,39 @@ A phone-first, open-world 3D adventure game built with Three.js (via CDN — no 
 3. Connect the repo to Vercel — no build command or output directory needs to be set
 4. Open the deployed URL on your phone
 
-## Fixed: game not starting / buttons unresponsive
-A CSS rule was forcing a full-screen, undismissable "rotate your phone" overlay to cover the entire screen (above every button, including Start) any time the phone was held in normal portrait orientation. It's now a small dismissible tip instead — it no longer blocks any input, in either orientation.
+## Bugs fixed in this pass
+- A CSS rule forced a full-screen, undismissable "rotate your phone" overlay to cover the entire game — including the Start button — whenever the phone was in normal portrait orientation. It's now a small dismissible tip that never blocks input.
+- Attack, dodge, and block were each wired to fire on **both** `pointerdown` and `touchstart` for the same tap, silently double-spending stamina and making inputs intermittently fail. Now bound once, via `pointerdown` only.
+- After the first zone change, the on-screen objective text would silently freeze because a status update rebuilt its container with `innerHTML`, orphaning the JS reference to it. Objective and zone-name are now separate elements updated directly.
+- A defeated boss could reappear alive after a page reload, since only `bossAwakened` was saved, not whether it had actually died. Fixed by keying it off `zone2Complete`, which is only set once the boss is actually defeated.
+- Defeating the boss used to immediately end the game, which contradicted unlocking Zone 3 for continued play. It now just opens the path west and lets you keep going.
+- World map, options, and pause menus visually covered the game but didn't actually freeze it — enemies could keep attacking behind an open menu. All panel overlays now pause gameplay updates while open.
 
 ## About the Nolu dialogue feature (`api/chat.js`)
-This calls Vercel's AI Gateway to generate live NPC dialogue. It needs Vercel's AI Gateway configured (an API key or OIDC) to work — without that, the TALK button just shows one of the built-in offline lines, which is a safe fallback and won't break the rest of the game. If you don't want this feature or its extra dependency, you can delete `api/chat.js`, `package.json`, and `package-lock.json`, and remove the `ai` dependency entirely — the game runs the same without it.
+This calls Vercel's AI Gateway to generate live NPC dialogue. It needs Vercel's AI Gateway configured (an API key or OIDC) to work — without that, the TALK button shows one of the built-in, zone-aware offline lines instead, which is a safe fallback and won't break the rest of the game. If you don't want this feature or its extra dependency, delete `api/chat.js`, `package.json`, and `package-lock.json` — the game runs the same without them.
 
 ## Current features
-- Open 3D area ("The Hills") with a touch joystick, attack, and dodge controls
-- Scripted intro cutscene (camera pan + text) with a Start button
-- Shrine-driven quest: defeat 3 shades to open a portal
-- A second zone ("The Ashen Ruins") with tougher enemies and a boss fight, reachable through the portal, with a return portal back
-- Minimap, stamina bar, health bar, game-over/restart flow
-- Optional live NPC dialogue with voice playback (browser speech synthesis)
+- Open-world exploration across **3 zones** — The Hills, The Ashen Ruins, and The Sunken Vale — connected by portals, plus fast-travel via the world map once a zone is unlocked
+- A day/night cycle with a shifting sky gradient and matching light color
+- Touch joystick movement, attack (with a 3-hit combo), dodge, and hold-to-block with a parry window
+- Enemy variety: melee shades, ranged enemies that throw projectiles, shielded enemies that must be flanked, and a boss fight with a telegraphed heavy attack
+- Difficulty scales up per zone
+- Collectible shards spent at an upgrade altar for +Health, +Stamina, or +Attack Damage
+- Save/checkpoint system (browser `localStorage`) with a "Continue" option on the start screen
+- Particle effects (footstep dust, hit sparks, pickup bursts), a minimap, health/stamina bars, haptic feedback on hits and dodges
+- Pause menu and an options menu (volume, SFX toggle, control sensitivity, colorblind-friendly enemy shape markers)
+- All sound is synthesized live with the Web Audio API — no external audio files
+- Optional live NPC dialogue with voice playback (browser speech synthesis), falling back to zone-aware offline lines
+
+## Known limitations (honest gaps)
+- The player character is still a procedural placeholder, not a rigged/animated model
+- Zone 3 has no final boss or ending yet — it's an explorable area, ready for one
+- Save data is per-browser (`localStorage`), not synced across devices
 
 ## Next steps to keep building
 - Add real character animation: export a rigged model + animations from mixamo.com (free), then load it with Three.js's GLTFLoader in place of the placeholder character
-- Add a save/checkpoint system so quest progress persists on reload
-- Copy the "zone2" block in index.html to add a third explorable area
+- Give Zone 3 its own boss and a true ending
+- Move save data to Supabase (which you're already using for Blescy) so progress syncs across devices
 
 ## Editing without a terminal
 Since `index.html` needs no build step, you can edit it directly in GitHub's web-based file editor (pencil icon) and commit — Vercel redeploys automatically.

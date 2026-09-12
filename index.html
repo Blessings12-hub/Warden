@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Warden — 3D Adventure Starter</title>
+<title>Warden — 3D Adventure</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; touch-action: none; }
-  #game-canvas { display: block; width: 100%; height: 100%; }
+  #game-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  button { font-family: inherit; touch-action: manipulation; }
 
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 
   #cutscene {
     position: fixed; inset: 0; background: #000; z-index: 100;
     display: flex; align-items: flex-end; justify-content: center;
-    padding-bottom: 12%; transition: opacity 1.2s ease;
+    padding-bottom: 12%; transition: opacity 1s ease;
   }
   #cutscene p {
     color: #eee; font-size: 15px; letter-spacing: 1px; opacity: 0;
@@ -26,6 +27,7 @@
     background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.3);
     padding: 8px 16px; border-radius: 20px; font-size: 13px; pointer-events: all;
   }
+  #cutscene-content { display:flex; flex-direction:column; align-items:center; }
   #start-btn {
     margin-top: 22px; padding: 13px 25px; border: 1px solid rgba(143,200,255,.75);
     border-radius: 24px; background: linear-gradient(135deg, rgba(44,91,130,.9), rgba(15,33,57,.95));
@@ -33,8 +35,13 @@
     pointer-events: all; box-shadow: 0 0 24px rgba(102,204,255,.2);
   }
   #start-btn:active { transform: scale(.97); background: #24557a; }
-  #cutscene-content { display:flex; flex-direction:column; align-items:center; }
+  #continue-btn {
+    margin-top: 10px; padding: 9px 22px; border: 1px solid rgba(180,220,255,.4);
+    border-radius: 20px; background: rgba(255,255,255,.06); color: #cfe6ff; font-size: 11px;
+    letter-spacing: 1px; pointer-events: all; display: none;
+  }
   #load-error { display:none; max-width:300px; color:#ffc4b8; font-size:13px; line-height:1.5; text-align:center; }
+
   #rotate-prompt {
     display:none; position:fixed; left:50%; top:16px; transform:translateX(-50%);
     z-index:130; max-width:280px; text-align:center; padding:14px 18px;
@@ -46,87 +53,76 @@
   #rotate-prompt h2 { font-size:11px; letter-spacing:1.5px; margin-bottom:4px; }
   #rotate-prompt p { color:#aebfd0; font-size:11px; line-height:1.4; margin-bottom:8px; }
   #rotate-dismiss { border:1px solid rgba(143,200,255,.55); border-radius:16px; padding:5px 14px; color:#eaf6ff; background:#16334f; font-size:11px; letter-spacing:.5px; }
+
   #nolu-nameplate { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#d9f3ff; font-size:10px; letter-spacing:2px; text-shadow:0 0 8px #2e9dcc; opacity:0; transition:opacity .3s; }
-  #dialogue { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); width:min(440px,calc(100vw - 32px)); z-index:115; display:none; padding:14px; border:1px solid rgba(143,200,255,.5); border-radius:14px; background:rgba(5,12,22,.92); color:#eaf6ff; box-shadow:0 0 28px rgba(54,158,220,.18); pointer-events:all; }
+  #dialogue { position:fixed; left:50%; bottom:78px; transform:translateX(-50%); width:min(400px,calc(100vw - 90px)); z-index:115; display:none; padding:12px; border:1px solid rgba(143,200,255,.5); border-radius:14px; background:rgba(5,12,22,.92); color:#eaf6ff; box-shadow:0 0 28px rgba(54,158,220,.18); pointer-events:all; }
   #dialogue strong { color:#8fd0ff; font-size:10px; letter-spacing:2px; }
-  #dialogue-text { margin:7px 0 11px; line-height:1.45; font-size:13px; }
+  #dialogue-text { margin:6px 0 9px; line-height:1.4; font-size:12px; }
   #dialogue-actions { display:flex; gap:8px; justify-content:flex-end; }
-  #talk-btn, #voice-btn { border:1px solid rgba(143,200,255,.55); border-radius:16px; padding:7px 11px; color:#eaf6ff; background:#16334f; font-size:11px; pointer-events:all; }
+  #talk-btn, #voice-btn { border:1px solid rgba(143,200,255,.55); border-radius:16px; padding:6px 10px; color:#eaf6ff; background:#16334f; font-size:10px; pointer-events:all; }
   #talk-btn:disabled { opacity:.55; }
-  #voice-note { color:#91a9bc; font-size:10px; margin-top:8px; }
-  #nolu-hint { position:absolute; bottom:146px; left:50%; transform:translateX(-50%); color:#bfeaff; font-size:11px; background:rgba(2,10,18,.68); border:1px solid rgba(128,205,255,.3); border-radius:12px; padding:6px 10px; white-space:nowrap; opacity:0; transition:opacity .3s; }
+  #nolu-hint { position:absolute; bottom:190px; left:50%; transform:translateX(-50%); color:#bfeaff; font-size:11px; background:rgba(2,10,18,.68); border:1px solid rgba(128,205,255,.3); border-radius:12px; padding:6px 10px; white-space:nowrap; opacity:0; transition:opacity .3s; }
 
-  #joystick-zone {
-    position: absolute; left: 24px; bottom: 24px; width: 130px; height: 130px;
-    pointer-events: all;
-  }
-  #joystick-base {
-    width: 100%; height: 100%; border-radius: 50%;
-    background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25);
-  }
-  #joystick-knob {
-    position: absolute; top: 35px; left: 35px; width: 60px; height: 60px; border-radius: 50%;
-    background: rgba(255,255,255,0.35); pointer-events: none;
-  }
+  #joystick-zone { position: absolute; left: 22px; bottom: 22px; width: 128px; height: 128px; pointer-events: all; }
+  #joystick-base { width: 100%; height: 100%; border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25); }
+  #joystick-knob { position: absolute; top: 34px; left: 34px; width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.35); pointer-events: none; }
 
-  #attack-btn {
-    position: absolute; right: 28px; bottom: 40px; width: 78px; height: 78px; border-radius: 50%;
-    background: rgba(200,40,40,0.55); border: 2px solid rgba(255,255,255,0.4);
-    color: #fff; font-size: 13px; font-weight: 600; pointer-events: all;
-  }
+  #attack-btn { position: absolute; right: 24px; bottom: 76px; width: 72px; height: 72px; border-radius: 50%; background: rgba(200,40,40,0.55); border: 2px solid rgba(255,255,255,0.4); color: #fff; font-size: 12px; font-weight: 600; pointer-events: all; }
   #attack-btn:active { background: rgba(255,60,60,0.8); }
+  #dodge-btn { position: absolute; right: 104px; bottom: 22px; width: 54px; height: 54px; border-radius: 50%; background: rgba(60,120,255,0.5); border: 2px solid rgba(255,255,255,0.35); color: #fff; font-size: 10px; font-weight: 600; pointer-events: all; }
+  #block-btn { position: absolute; right: 20px; bottom: 4px; width: 54px; height: 54px; border-radius: 50%; background: rgba(120,220,150,0.45); border: 2px solid rgba(255,255,255,0.35); color: #fff; font-size: 9px; font-weight: 600; pointer-events: all; }
+  #block-btn.blocking { background: rgba(120,220,150,0.85); }
 
-  #dodge-btn {
-    position: absolute; right: 118px; bottom: 20px; width: 58px; height: 58px; border-radius: 50%;
-    background: rgba(60,120,255,0.5); border: 2px solid rgba(255,255,255,0.35);
-    color: #fff; font-size: 11px; font-weight: 600; pointer-events: all;
-  }
-
-  #top-bar {
-    position: absolute; top: 16px; left: 16px; right: 16px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  #health-wrap { width: 140px; }
+  #top-bar { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+  #health-wrap { width: 138px; }
   #health-label { color: #ccc; font-size: 10px; letter-spacing: 1px; margin-bottom: 3px; }
   #health-bar-bg { width: 100%; height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; }
   #health-bar { width: 100%; height: 100%; background: linear-gradient(90deg,#e33,#f66); transition: width 0.25s; }
-
-  #prompt {
-    position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
-    color: #fff; font-size: 12px; background: rgba(0,0,0,0.4); padding: 6px 14px;
-    border-radius: 12px; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
-  }
-
-  #quest-banner {
-    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
-    color: #eaf6ff; font-size: 12px; letter-spacing: 0.5px; text-align: center;
-    background: rgba(10,20,30,0.55); border: 1px solid rgba(120,180,255,0.35);
-    padding: 8px 16px; border-radius: 10px; opacity: 0; transition: opacity 0.5s;
-    max-width: 260px;
-  }
-  #quest-title { font-size: 10px; color: #8fc8ff; letter-spacing: 1.5px; margin-bottom: 2px; }
-
-  #zone-flash {
-    position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none;
-    z-index: 90; transition: opacity 0.4s;
-  }
-  #brand { position:absolute; top:16px; left:50%; transform:translateX(-50%); color:#eaf6ff; font-size:18px; letter-spacing:5px; font-weight:700; text-shadow:0 0 18px #66ccff; }
-  #status { position:absolute; top:62px; right:16px; color:#b9c7d4; font-size:10px; letter-spacing:1px; text-align:right; }
-  #health-value { color:#fff; font-size:11px; margin-top:4px; text-align:right; }
-  #action-status { position:absolute; right:16px; bottom:124px; color:#b9c7d4; font-size:10px; letter-spacing:1px; text-align:right; }
-  #stamina-wrap { width:140px; margin-top:7px; }
+  #health-value { color:#fff; font-size:10px; margin-top:3px; }
+  #stamina-wrap { width:138px; margin-top:6px; }
   #stamina-bg { width:100%; height:6px; background:rgba(255,255,255,.13); border-radius:4px; overflow:hidden; }
   #stamina-bar { width:100%; height:100%; background:linear-gradient(90deg,#55bfff,#b9f3ff); transition:width .15s; }
-  #minimap { position:absolute; top:94px; right:16px; width:112px; height:112px; border-radius:50%; border:1px solid rgba(160,210,255,.5); background:rgba(3,9,16,.72); box-shadow:0 0 20px rgba(50,140,220,.18); }
-  #boss-wrap { position:absolute; top:142px; left:50%; transform:translateX(-50%); width:min(300px,72vw); opacity:0; transition:opacity .3s; text-align:center; }
-  #boss-name { color:#ffb39f; font-size:10px; letter-spacing:2px; margin-bottom:4px; }
-  #boss-bg { height:8px; background:rgba(0,0,0,.5); border:1px solid rgba(255,180,140,.4); border-radius:5px; overflow:hidden; }
+  #shard-wrap { color:#eaf6ff; font-size:11px; margin-top:6px; letter-spacing:.5px; }
+  #shard-wrap span { color:#8fe0d0; font-weight:700; }
+
+  #right-col { display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:all; }
+  #brand { color:#eaf6ff; font-size:15px; letter-spacing:4px; font-weight:700; text-shadow:0 0 16px #66ccff; text-align:right; }
+  #status { color:#b9c7d4; font-size:9px; letter-spacing:1px; text-align:right; }
+  #icon-row { display:flex; gap:6px; }
+  .icon-btn { width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,.3); background:rgba(10,20,30,.55); color:#eaf6ff; font-size:13px; pointer-events:all; }
+  #minimap { border-radius:50%; border:1px solid rgba(160,210,255,.5); background:rgba(3,9,16,.72); box-shadow:0 0 20px rgba(50,140,220,.18); }
+
+  #prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 12px; background: rgba(0,0,0,0.45); padding: 6px 14px; border-radius: 12px; opacity: 0; transition: opacity 0.3s; white-space: nowrap; text-align:center; }
+  #quest-banner { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); color: #eaf6ff; font-size: 11px; letter-spacing: 0.5px; text-align: center; background: rgba(10,20,30,0.55); border: 1px solid rgba(120,180,255,0.35); padding: 7px 14px; border-radius: 10px; opacity: 0; transition: opacity 0.5s; max-width: 250px; }
+  #quest-title { font-size: 9px; color: #8fc8ff; letter-spacing: 1.5px; margin-bottom: 2px; }
+  #boss-wrap { position:absolute; top:132px; left:50%; transform:translateX(-50%); width:min(280px,68vw); opacity:0; transition:opacity .3s; text-align:center; }
+  #boss-name { color:#ffb39f; font-size:9px; letter-spacing:2px; margin-bottom:4px; }
+  #boss-bg { height:7px; background:rgba(0,0,0,.5); border:1px solid rgba(255,180,140,.4); border-radius:5px; overflow:hidden; }
   #boss-bar { width:100%; height:100%; background:linear-gradient(90deg,#a32d3b,#ff9b6a); }
-  #game-over { position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:rgba(3,6,12,.86); color:#fff; text-align:center; }
-  #game-over h1 { color:#ff8f8f; letter-spacing:4px; font-size:26px; }
+  #parry-flash { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:95; }
+  #zone-flash { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 90; transition: opacity 0.4s; }
+
+  #pickup-toast { position:absolute; top:170px; left:50%; transform:translateX(-50%); color:#a9f5df; font-size:11px; background:rgba(6,20,16,.6); border:1px solid rgba(140,240,200,.35); padding:5px 12px; border-radius:10px; opacity:0; transition:opacity .3s; }
+
+  #game-over { position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:rgba(3,6,12,.9); color:#fff; text-align:center; padding: 20px; }
+  #game-over h1 { color:#ff8f8f; letter-spacing:4px; font-size:24px; }
   #game-over p { color:#b9c7d4; font-size:13px; }
   #restart-btn { pointer-events:all; border:1px solid #7abfff; border-radius:20px; padding:10px 20px; color:#eaf6ff; background:#17304a; }
-  @media (min-width:700px) { #joystick-zone,#attack-btn,#dodge-btn { opacity:.45; } #joystick-zone { left:32px; bottom:32px; } #attack-btn { right:36px; } #dodge-btn { right:130px; } }
+
+  .panel-overlay { position:fixed; inset:0; z-index:140; display:none; align-items:center; justify-content:center; background:rgba(3,6,12,.86); padding:20px; }
+  .panel-overlay.show { display:flex; }
+  .panel-card { width:min(340px, 92vw); max-height:82vh; overflow-y:auto; background:linear-gradient(160deg,#0b1826,#050b13); border:1px solid rgba(143,200,255,.3); border-radius:16px; padding:20px; color:#eaf6ff; }
+  .panel-card h2 { font-size:14px; letter-spacing:2px; margin-bottom:14px; color:#8fd0ff; text-align:center; }
+  .panel-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; font-size:12px; gap:10px; }
+  .panel-row input[type="range"] { width:130px; }
+  .panel-btn { width:100%; margin-top:6px; padding:10px; border:1px solid rgba(143,200,255,.4); border-radius:10px; background:#16334f; color:#eaf6ff; font-size:12px; letter-spacing:.5px; }
+  .panel-btn:disabled { opacity:.4; }
+  .panel-btn.close { background:transparent; border-color:rgba(255,255,255,.25); margin-top:14px; }
+  .zone-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px; }
+  .zone-row.locked { opacity:.4; }
+  .zone-travel-btn { padding:6px 12px; border-radius:14px; border:1px solid rgba(143,200,255,.4); background:#16334f; color:#eaf6ff; font-size:10px; }
+  .toggle-btn { padding:5px 12px; border-radius:12px; border:1px solid rgba(143,200,255,.4); background:#16334f; color:#eaf6ff; font-size:10px; }
+  .toggle-btn.on { background:#2c7a5c; }
 </style>
 </head>
 <body>
@@ -137,12 +133,13 @@
   <div id="cutscene-content">
     <p id="cutscene-text">The old world sleeps beneath the ash-grey hills...</p>
     <button id="start-btn" type="button">START JOURNEY</button>
+    <button id="continue-btn" type="button">CONTINUE SAVED JOURNEY</button>
     <p id="load-error">The 3D engine could not load. Check your connection and reload the page.</p>
   </div>
 </div>
 <button id="skip-btn" type="button">Skip ▶</button>
 <div id="rotate-prompt" role="status" aria-live="polite"><span class="rotate-icon" aria-hidden="true">↻</span><h2>TIP</h2><p>Playing in landscape gives a wider view — but portrait works fine too.</p><button id="rotate-dismiss" type="button">GOT IT</button></div>
-  
+
 <div id="hud">
   <div id="top-bar">
     <div id="health-wrap">
@@ -150,32 +147,87 @@
       <div id="health-bar-bg"><div id="health-bar"></div></div>
       <div id="health-value">100 / 100</div>
       <div id="stamina-wrap"><div id="stamina-bg"><div id="stamina-bar"></div></div></div>
+      <div id="shard-wrap">SHARDS <span id="shard-count">0</span></div>
+    </div>
+    <div id="right-col">
+      <div id="brand">WARDEN</div>
+      <div id="status"><span id="zone-name">THE HILLS</span><br><span id="objective">AWAITING SHRINE</span></div>
+      <div id="icon-row">
+        <button class="icon-btn" id="map-btn" type="button" title="Map">🗺</button>
+        <button class="icon-btn" id="pause-btn" type="button" title="Pause">❚❚</button>
+        <button class="icon-btn" id="options-btn" type="button" title="Options">⚙</button>
+      </div>
+      <canvas id="minimap" width="192" height="192" aria-label="World map"></canvas>
     </div>
   </div>
-  <div id="brand">WARDEN</div>
-  <div id="status">THE HILLS<br><span id="objective">AWAITING SHRINE</span></div>
-  <div id="action-status">SPACE ATTACK · SHIFT DODGE</div>
-  <canvas id="minimap" width="224" height="224" aria-label="World map"></canvas>
   <div id="boss-wrap"><div id="boss-name">THE ASHEN WARDEN</div><div id="boss-bg"><div id="boss-bar"></div></div></div>
   <div id="prompt">Walk into the glowing shrine</div>
+  <div id="pickup-toast">Shard collected</div>
   <div id="quest-banner"><div id="quest-title">QUEST</div><div id="quest-text"></div></div>
-  <div id="joystick-zone">
-    <div id="joystick-base"></div>
-    <div id="joystick-knob"></div>
-  </div>
-  <button id="dodge-btn">DODGE</button>
-  <button id="attack-btn">ATTACK</button>
+  <div id="joystick-zone"><div id="joystick-base"></div><div id="joystick-knob"></div></div>
+  <button id="dodge-btn" type="button">DODGE</button>
+  <button id="attack-btn" type="button">ATTACK</button>
+  <button id="block-btn" type="button">BLOCK</button>
 </div>
 
 <div id="zone-flash"></div>
+<div id="parry-flash"></div>
 <div id="nolu-nameplate">NOLU</div>
 <div id="nolu-hint">Tap TALK for Nolu&apos;s field briefing</div>
-<div id="dialogue" aria-live="polite"><strong id="dialogue-speaker">NOLU</strong><div id="dialogue-text">The hills remember every footstep.</div><div id="dialogue-actions"><button id="voice-btn" type="button">VOICE</button><button id="talk-btn" type="button">TALK</button></div><div id="voice-note">Live dialogue uses the Vercel AI Gateway when deployed. Voice playback uses your browser&apos;s speech synthesis.</div></div>
-<div id="game-over"><h1 id="game-over-title">WARDEN FALLEN</h1><p id="game-over-copy">The hills wait in silence.</p><button id="restart-btn">RESTART JOURNEY</button></div>
+<div id="dialogue" aria-live="polite"><strong id="dialogue-speaker">NOLU</strong><div id="dialogue-text">The hills remember every footstep.</div><div id="dialogue-actions"><button id="voice-btn" type="button">VOICE</button><button id="talk-btn" type="button">TALK</button></div></div>
+<div id="game-over"><h1 id="game-over-title">WARDEN FALLEN</h1><p id="game-over-copy">The hills wait in silence.</p><button id="restart-btn" type="button">RESTART JOURNEY</button></div>
+
+<div class="panel-overlay" id="pause-overlay"><div class="panel-card">
+  <h2>PAUSED</h2>
+  <button class="panel-btn" id="resume-btn" type="button">RESUME</button>
+  <button class="panel-btn" id="pause-options-btn" type="button">OPTIONS</button>
+  <button class="panel-btn" id="pause-restart-btn" type="button">RESTART JOURNEY</button>
+</div></div>
+
+<div class="panel-overlay" id="options-overlay"><div class="panel-card">
+  <h2>OPTIONS</h2>
+  <div class="panel-row"><span>Master Volume</span><input type="range" id="volume-slider" min="0" max="100" value="60"></div>
+  <div class="panel-row"><span>Sound Effects</span><button class="toggle-btn on" id="sfx-toggle" type="button">ON</button></div>
+  <div class="panel-row"><span>Control Sensitivity</span><input type="range" id="sensitivity-slider" min="60" max="160" value="100"></div>
+  <div class="panel-row"><span>Colorblind Outlines</span><button class="toggle-btn" id="colorblind-toggle" type="button">OFF</button></div>
+  <button class="panel-btn close" id="options-close-btn" type="button">CLOSE</button>
+</div></div>
+
+<div class="panel-overlay" id="map-overlay"><div class="panel-card">
+  <h2>WORLD MAP</h2>
+  <div id="zone-list"></div>
+  <button class="panel-btn close" id="map-close-btn" type="button">CLOSE</button>
+</div></div>
+
+<div class="panel-overlay" id="upgrade-overlay"><div class="panel-card">
+  <h2>WARDEN'S ALTAR</h2>
+  <p style="font-size:11px;color:#aebfd0;text-align:center;margin-bottom:14px;">Spend shards to grow stronger</p>
+  <div class="panel-row"><span>+20 Max Health (<span id="cost-hp">10</span> shards)</span></div>
+  <button class="panel-btn" id="upgrade-hp-btn" type="button">UPGRADE HEALTH</button>
+  <div class="panel-row" style="margin-top:14px;"><span>+20 Max Stamina (<span id="cost-stam">10</span> shards)</span></div>
+  <button class="panel-btn" id="upgrade-stam-btn" type="button">UPGRADE STAMINA</button>
+  <div class="panel-row" style="margin-top:14px;"><span>+2 Attack Damage (<span id="cost-dmg">15</span> shards)</span></div>
+  <button class="panel-btn" id="upgrade-dmg-btn" type="button">UPGRADE DAMAGE</button>
+  <button class="panel-btn close" id="upgrade-close-btn" type="button">CLOSE</button>
+</div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// Bootstrap the intro controls before the 3D scene finishes loading.
+/* =========================================================================
+   WARDEN — Open-World 3D Adventure
+   Engine: Three.js r128 (CDN, no build step — edit this file directly and
+   push via GitHub's web uploader; Vercel deploys automatically).
+
+   No external assets are used anywhere in this file — no downloaded audio,
+   no downloaded 3D models. All visuals are built from Three.js primitives,
+   and all sound is synthesized live with the Web Audio API. This was a
+   deliberate choice: this environment can't fetch or bundle external asset
+   files. Swapping in a real Mixamo character (see the note further down)
+   or licensed music/SFX later is a manual step you'd do on your own
+   machine — this file is built so it drops in cleanly when you do.
+   ========================================================================= */
+
+// --- Bootstrap: intro control refs before the 3D scene finishes loading ---
 var cutscenePlaying = true;
 var cutsceneStep = 0, cutsceneTimer = 0;
 var cutsceneEl = document.getElementById('cutscene');
@@ -191,7 +243,7 @@ function requestLandscapeMode() {
   if (orientation && orientation.lock) {
     try { orientation.lock('landscape').catch(function () {}); } catch (error) { /* unsupported on iOS Safari and others, ignore */ }
   }
-  // Non-blocking tip only — never prevents play in portrait.
+  // Non-blocking tip only — this must never prevent play in portrait.
   if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
     var tip = document.getElementById('rotate-prompt');
     if (tip) {
@@ -200,38 +252,39 @@ function requestLandscapeMode() {
     }
   }
 }
-/* =========================================================================
-   WARDEN — Open-World 3D Adventure Starter
-   Engine: Three.js r128 (CDN, no build step — edit this file directly and
-   push via GitHub's web uploader; Vercel deploys automatically).
 
-   THIS IS A STARTER, NOT A FINISHED GAME. It gives you:
-   - An open outdoor 3D area (expandable — this is your "open world" seed)
-   - A player character (placeholder capsule) with WASD/touch movement
-   - Third-person camera that follows and orbits
-   - Attack + dodge actions with simple animation via code (no mocap yet)
-   - A scripted intro "cutscene" (camera pan + text) — this is how real
-     cinematics get built without a timeline editor: move the camera and
-     trigger animations via code, on a schedule
-   - A basic enemy with simple AI (chases, can be hit)
-   - A shrine-driven quest: walk up to it, clear 3 shades, and it opens a
-     glowing portal
-   - A SECOND zone ("The Ashen Ruins") reachable through that portal, with
-     its own terrain, obstacles, and tougher enemies — plus a return portal.
-     This is your "open world" pattern: each new area is its own group
-     (ground + obstacles + enemies + a portal), toggled visible on teleport.
-     Copy the zone2 block further down to add a zone3.
+function vibrate(pattern) {
+  if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} }
+}
 
-   HOW TO ADD REAL MOTION-CAPTURE ANIMATION LATER:
-   1. Go to mixamo.com (free, Adobe account) on a desktop browser
-   2. Pick a character model, download animations (walk, run, attack, idle)
-      as .glb/.fbx
-   3. Add the GLTFLoader script (see commented import below) and load the
-      .glb instead of the capsule mesh — Mixamo animations plug into
-      Three.js's AnimationMixer directly
-   4. This step needs a one-time desktop session to export the files, but
-      after that, everything is edited/deployed the same phone-first way
-   ========================================================================= */
+// --- Settings persistence ----------------------------------------------------
+const SETTINGS_KEY = 'warden-settings-v1';
+const SAVE_KEY = 'warden-save-v1';
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return Object.assign({ volume: 60, sfxOn: true, sensitivity: 100, colorblind: false }, JSON.parse(raw));
+  } catch (e) {}
+  return { volume: 60, sfxOn: true, sensitivity: 100, colorblind: false };
+}
+function saveSettings(s) {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) {}
+}
+const settings = loadSettings();
+
+function loadSaveData() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+function writeSaveData(data) {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function clearSaveData() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
 
 // --- Renderer / Scene / Camera ---------------------------------------------
 const canvas = document.getElementById('game-canvas');
@@ -241,30 +294,80 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0e14);
-scene.fog = new THREE.Fog(0x0a0e14, 20, 90);
-
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+
+// --- Sky dome with a day/night gradient --------------------------------------
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 128;
+const skyCtx = skyCanvas.getContext('2d');
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+const skyGeo = new THREE.SphereGeometry(300, 16, 16);
+const skyMat = new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide, fog: false, depthWrite: false });
+const skyDome = new THREE.Mesh(skyGeo, skyMat);
+scene.add(skyDome);
+
+let dayTime = 0.28; // 0..1 full cycle; starts mid-morning
+const DAY_LENGTH_SECONDS = 300; // 5 minutes per full day/night cycle
+function skyColorsFor(t) {
+  // t: 0=midnight .. 0.25=dawn .. 0.5=noon .. 0.75=dusk .. 1=midnight
+  const stops = [
+    { t: 0.00, top: [4,7,18],   bottom: [10,14,28] },
+    { t: 0.22, top: [30,30,55], bottom: [180,120,110] },
+    { t: 0.30, top: [80,130,190], bottom: [255,200,160] },
+    { t: 0.50, top: [70,150,220], bottom: [190,225,240] },
+    { t: 0.70, top: [60,110,190], bottom: [255,190,150] },
+    { t: 0.78, top: [30,25,55],  bottom: [160,90,90] },
+    { t: 1.00, top: [4,7,18],   bottom: [10,14,28] },
+  ];
+  let a = stops[0], b = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i].t && t <= stops[i + 1].t) { a = stops[i]; b = stops[i + 1]; break; }
+  }
+  const span = (b.t - a.t) || 1;
+  const f = (t - a.t) / span;
+  const lerp = (c1, c2) => c1.map((v, i) => Math.round(v + (c2[i] - v) * f));
+  return { top: lerp(a.top, b.top), bottom: lerp(a.bottom, b.bottom) };
+}
+function updateSky() {
+  const { top, bottom } = skyColorsFor(dayTime);
+  const grad = skyCtx.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, `rgb(${top.join(',')})`);
+  grad.addColorStop(1, `rgb(${bottom.join(',')})`);
+  skyCtx.fillStyle = grad;
+  skyCtx.fillRect(0, 0, 2, 128);
+  skyTexture.needsUpdate = true;
+  const fogColor = new THREE.Color(`rgb(${bottom.join(',')})`);
+  scene.fog.color.copy(fogColor);
+  scene.background = fogColor;
+  const brightness = 0.35 + Math.sin(dayTime * Math.PI) * 0.75;
+  ambient.intensity = Math.max(0.25, brightness * 0.9);
+  moon.intensity = Math.max(0.15, brightness * 1.2);
+  const sunAngle = dayTime * Math.PI * 2 - Math.PI / 2;
+  moon.position.set(Math.cos(sunAngle) * 40, Math.max(4, Math.sin(sunAngle) * 40), -10);
+  const warm = dayTime < 0.32 || dayTime > 0.66;
+  moon.color.set(warm ? 0xffb37a : 0xaabbff);
+}
+scene.fog = new THREE.Fog(0x0a0e14, 20, 95);
 
 // --- Lighting ---------------------------------------------------------------
 const ambient = new THREE.AmbientLight(0x445566, 0.9);
 scene.add(ambient);
 const moon = new THREE.DirectionalLight(0xaabbff, 1.1);
-moon.position.set(-20, 30, -10);
 moon.castShadow = true;
-moon.shadow.mapSize.set(2048, 2048);
+moon.shadow.mapSize.set(1024, 1024);
 moon.shadow.camera.left = -40; moon.shadow.camera.right = 40;
 moon.shadow.camera.top = 40; moon.shadow.camera.bottom = -40;
 scene.add(moon);
+updateSky();
+
+// --- Difficulty scaling per zone ----------------------------------------------
+const ZONE_DIFFICULTY = { 1: 1, 2: 1.6, 3: 2.3 };
 
 // --- Zone system --------------------------------------------------------------
-// Two zones live side by side in the scene graph, in their own groups, so you
-// can toggle visibility instantly on "teleport" instead of rebuilding meshes.
-// Add a zone3 later the same way: new group, own ground/obstacles/enemies,
-// linked in by a portal pair.
 const zone1 = new THREE.Group();
 const zone2 = new THREE.Group();
-scene.add(zone1, zone2);
+const zone3 = new THREE.Group();
+scene.add(zone1, zone2, zone3);
 
 function makePortal(color) {
   const g = new THREE.Group();
@@ -279,15 +382,35 @@ function makePortal(color) {
   return g;
 }
 
+function addTree(parent, x, z, tint) {
+  const tree = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.16,.24,1.5,6), new THREE.MeshStandardMaterial({color:0x4b3328}));
+  trunk.position.y=.75; tree.add(trunk);
+  const crown = new THREE.Mesh(new THREE.ConeGeometry(1.15,2.7,7), new THREE.MeshStandardMaterial({color:tint, roughness:1}));
+  crown.position.y=2.35; tree.add(crown); tree.position.set(x,0,z); tree.rotation.y=Math.random()*6; tree.castShadow=true; parent.add(tree);
+}
+
+// Generic collectible shard — used across all zones
+const shardGeo = new THREE.OctahedronGeometry(0.32, 0);
+const shardMat = new THREE.MeshStandardMaterial({ color: 0x8fe0d0, emissive: 0x2c9c82, emissiveIntensity: 1.3 });
+const allShards = [];
+function addShard(parent, x, z) {
+  const s = new THREE.Mesh(shardGeo, shardMat);
+  s.position.set(x, 1, z);
+  s.userData = { collected: false, id: parent.userData.zoneId + '_' + x.toFixed(1) + '_' + z.toFixed(1) };
+  parent.add(s);
+  allShards.push(s);
+  return s;
+}
+
 // --- ZONE 1: The Hills (starting area) ----------------------------------------
-const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+zone1.userData = { zoneId: 1, name: 'The Hills' };
 const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a3428, roughness: 1 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200, 20, 20), groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 zone1.add(ground);
 
-// Scatter some rocks/obstacles so the world feels populated
 const rockMat = new THREE.MeshStandardMaterial({ color: 0x555f5a, roughness: 0.9 });
 const obstacles = [];
 for (let i = 0; i < 18; i++) {
@@ -297,37 +420,43 @@ for (let i = 0; i < 18; i++) {
   const dist = 8 + Math.random() * 35;
   rock.position.set(Math.cos(angle) * dist, size * 0.4, Math.sin(angle) * dist);
   rock.rotation.set(Math.random(), Math.random(), Math.random());
-  rock.castShadow = true;
-  rock.receiveShadow = true;
+  rock.castShadow = true; rock.receiveShadow = true;
   zone1.add(rock);
   obstacles.push({ mesh: rock, radius: size });
 }
+for (let i=0;i<26;i++) { const a=Math.random()*Math.PI*2, d=18+Math.random()*68; addTree(zone1,Math.cos(a)*d,Math.sin(a)*d,0x263f35); }
+for (let i=0;i<6;i++) { addShard(zone1, Math.cos(i*1.3)*20, Math.sin(i*1.3)*20); }
 
-// --- Shrine (quest trigger — starts dormant, drives the whole quest state) ---
-const shrineGeo = new THREE.OctahedronGeometry(1.1, 0);
 const shrineMat = new THREE.MeshStandardMaterial({ color: 0x557799, emissive: 0x223344, emissiveIntensity: 0.5 });
-const shrine = new THREE.Mesh(shrineGeo, shrineMat);
+const shrine = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), shrineMat);
 shrine.position.set(14, 1.4, -10);
 zone1.add(shrine);
 const shrineLight = new THREE.PointLight(0x557799, 1, 12);
 shrineLight.position.copy(shrine.position);
 zone1.add(shrineLight);
 
-// Portal in zone 1 — hidden until the quest is complete
-const portalToZone2 = makePortal(0x66ccff);
-portalToZone2.position.set(22, 0, -10);
-portalToZone2.visible = false;
-zone1.add(portalToZone2);
+// Upgrade altar near spawn
+const altarMat = new THREE.MeshStandardMaterial({ color: 0xd8b06a, emissive: 0x8a5a1a, emissiveIntensity: 0.6 });
+const altar = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.4, 8), altarMat);
+altar.position.set(-6, 0.7, 8);
+zone1.add(altar);
+const altarLight = new THREE.PointLight(0xffcc77, 1.4, 8);
+altarLight.position.set(-6, 2, 8);
+zone1.add(altarLight);
 
-// --- ZONE 2: The Ashen Ruins (unlocked after the shrine quest) ---------------
-const ground2Geo = new THREE.PlaneGeometry(160, 160, 30, 30);
+const portal1to2 = makePortal(0x66ccff);
+portal1to2.position.set(22, 0, -10);
+portal1to2.visible = false;
+zone1.add(portal1to2);
+
+// --- ZONE 2: The Ashen Ruins ---------------------------------------------------
+zone2.userData = { zoneId: 2, name: 'The Ashen Ruins' };
 const ground2Mat = new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: 1 });
-const ground2 = new THREE.Mesh(ground2Geo, ground2Mat);
+const ground2 = new THREE.Mesh(new THREE.PlaneGeometry(160, 160, 20, 20), ground2Mat);
 ground2.rotation.x = -Math.PI / 2;
 ground2.receiveShadow = true;
 zone2.add(ground2);
 
-// Ruined pillars instead of rocks, so the zone reads as a distinct place
 const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6b5f52, roughness: 0.85 });
 const obstacles2 = [];
 for (let i = 0; i < 14; i++) {
@@ -337,53 +466,125 @@ for (let i = 0; i < 14; i++) {
   const dist = 6 + Math.random() * 30;
   pillar.position.set(Math.cos(angle) * dist, h / 2, Math.sin(angle) * dist);
   pillar.rotation.z = (Math.random() - 0.5) * 0.3;
-  pillar.castShadow = true;
-  pillar.receiveShadow = true;
+  pillar.castShadow = true; pillar.receiveShadow = true;
   zone2.add(pillar);
   obstacles2.push({ mesh: pillar, radius: 0.8 });
 }
+for (let i=0;i<16;i++) { const a=Math.random()*Math.PI*2, d=12+Math.random()*58; addTree(zone2,Math.cos(a)*d,Math.sin(a)*d,0x403331); }
+for (let i=0;i<6;i++) { addShard(zone2, Math.cos(i*1.6)*24, Math.sin(i*1.6)*24); }
 
-const portalToZone1 = makePortal(0xff9944);
-portalToZone1.position.set(0, 0, 8);
-zone2.add(portalToZone1);
-zone2.visible = false; // zone 2 starts hidden — revealed on first teleport
+const portal2to1 = makePortal(0xff9944);
+portal2to1.position.set(0, 0, 8);
+zone2.add(portal2to1);
+const portal2to3 = makePortal(0x8f5fff);
+portal2to3.position.set(-24, 0, 18);
+portal2to3.visible = false;
+zone2.add(portal2to3);
+zone2.visible = false;
 
-// --- Authored overworld dressing: groves, cliffs, and guiding lights ---------
-function addTree(parent, x, z, tint) {
-  const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.16,.24,1.5,6), new THREE.MeshStandardMaterial({color:0x4b3328}));
-  trunk.position.y=.75; tree.add(trunk);
-  const crown = new THREE.Mesh(new THREE.ConeGeometry(1.15,2.7,7), new THREE.MeshStandardMaterial({color:tint, roughness:1}));
-  crown.position.y=2.35; tree.add(crown); tree.position.set(x,0,z); tree.rotation.y=Math.random()*6; tree.castShadow=true; parent.add(tree);
+// --- ZONE 3: The Sunken Vale (unlocked after the boss) -------------------------
+zone3.userData = { zoneId: 3, name: 'The Sunken Vale' };
+const ground3Mat = new THREE.MeshStandardMaterial({ color: 0x1f3a34, roughness: 1 });
+const ground3 = new THREE.Mesh(new THREE.PlaneGeometry(150, 150, 20, 20), ground3Mat);
+ground3.rotation.x = -Math.PI / 2;
+ground3.receiveShadow = true;
+zone3.add(ground3);
+
+const padMat = new THREE.MeshStandardMaterial({ color: 0x2d5c46, roughness: 0.8 });
+const obstacles3 = [];
+for (let i = 0; i < 16; i++) {
+  const r = 1.2 + Math.random() * 1.4;
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.3, 10), padMat);
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 6 + Math.random() * 32;
+  pad.position.set(Math.cos(angle) * dist, 0.15, Math.sin(angle) * dist);
+  pad.receiveShadow = true;
+  zone3.add(pad);
+  obstacles3.push({ mesh: pad, radius: r + 0.3 });
 }
-for (let i=0;i<28;i++) { const a=Math.random()*Math.PI*2, d=18+Math.random()*68; addTree(zone1,Math.cos(a)*d,Math.sin(a)*d,0x263f35); }
-for (let i=0;i<18;i++) { const a=Math.random()*Math.PI*2, d=12+Math.random()*58; addTree(zone2,Math.cos(a)*d,Math.sin(a)*d,0x403331); }
-const beaconMat = new THREE.MeshStandardMaterial({color:0x8ad8ff, emissive:0x2c9ad1, emissiveIntensity:2});
-for (let i=0;i<6;i++) { const beacon=new THREE.Mesh(new THREE.CylinderGeometry(.08,.18,2.2,6),beaconMat); beacon.position.set(Math.cos(i)*12,1.1,Math.sin(i)*12); zone1.add(beacon); }
+for (let i=0;i<6;i++) { addShard(zone3, Math.cos(i*1.9)*20, Math.sin(i*1.9)*20); }
 
-// --- Nolu: procedural hero silhouette, built from Three.js primitives --------
+const portal3to2 = makePortal(0x8f5fff);
+portal3to2.position.set(0, 0, 6);
+zone3.add(portal3to2);
+zone3.visible = false;
+
+const zoneGroups = { 1: zone1, 2: zone2, 3: zone3 };
+const zoneObstacles = { 1: obstacles, 2: obstacles2, 3: obstacles3 };
+const zoneNames = { 1: 'The Hills', 2: 'The Ashen Ruins', 3: 'The Sunken Vale' };
+const zoneSpawns = { 1: {x:0,z:5}, 2: {x:0,z:5}, 3: {x:0,z:10} };
+
+// --- Nolu: procedural hero silhouette ------------------------------------------
 const player = new THREE.Group();
-const skinMat = new THREE.MeshStandardMaterial({ color: 0x9b674f, roughness: 0.62 });
 const cloakMat = new THREE.MeshStandardMaterial({ color: 0x183c59, roughness: 0.8 });
+const skinMat = new THREE.MeshStandardMaterial({ color: 0x9b674f, roughness: 0.62 });
 const trimMat = new THREE.MeshStandardMaterial({ color: 0x65d4e8, emissive: 0x0d5368, emissiveIntensity: .45, metalness: .35 });
 const hairMat = new THREE.MeshStandardMaterial({ color: 0x171423, roughness: .8 });
 const body = new THREE.Mesh(new THREE.CapsuleGeometry(.42, .82, 6, 12), cloakMat); body.position.y=1.05;
 const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 16, 12), skinMat); head.position.y=1.82;
 const hair = new THREE.Mesh(new THREE.SphereGeometry(.38, 16, 12, 0, Math.PI*2, 0, Math.PI*.62), hairMat); hair.position.y=1.94;
 const sash = new THREE.Mesh(new THREE.TorusGeometry(.43,.045,8,20), trimMat); sash.rotation.x=Math.PI/2; sash.position.y=1.18;
-const shoulder = new THREE.Mesh(new THREE.SphereGeometry(.48,.1,8), cloakMat); shoulder.scale.set(1,.42,.7); shoulder.position.y=1.36;
-[player, body, head, hair, sash, shoulder].forEach((m)=>{ if(m!==player){m.castShadow=true; player.add(m);} });
+[body, head, hair, sash].forEach((m)=>{ m.castShadow=true; player.add(m); });
 const swordGroup = new THREE.Group();
 const swordMat = new THREE.MeshStandardMaterial({ color: 0xb8f4ff, emissive: 0x2c9db9, emissiveIntensity: .55, metalness: .8, roughness: .2 });
 const blade = new THREE.Mesh(new THREE.BoxGeometry(.1,1.25,.16), swordMat); blade.position.set(.56,1.12,.3); blade.rotation.z=-.3; swordGroup.add(blade);
-const guard = new THREE.Mesh(new THREE.BoxGeometry(.5,.07,.1), trimMat); guard.position.set(.56,.66,.3); guard.rotation.z=-.3; swordGroup.add(guard); player.add(swordGroup);
-player.userData.heroName = 'Nolu';
-
+const guard = new THREE.Mesh(new THREE.BoxGeometry(.5,.07,.1), trimMat); guard.position.set(.56,.66,.3); guard.rotation.z=-.3; swordGroup.add(guard);
+player.add(swordGroup);
+// Shield visual, shown while blocking
+const shieldMat = new THREE.MeshStandardMaterial({ color: 0x4a9de0, emissive: 0x2a6aa8, emissiveIntensity: 0.8, transparent: true, opacity: 0.55 });
+const playerShield = new THREE.Mesh(new THREE.CircleGeometry(0.7, 16), shieldMat);
+playerShield.position.set(0, 1.1, 0.65);
+playerShield.visible = false;
+player.add(playerShield);
 player.position.set(0, 0, 5);
 scene.add(player);
 
-// --- Enemy (simple chase AI) -------------------------------------------------
-function makeEnemy(x, z, parentGroup, hp, color, scale) {
+// --- Particle system (dust, sparks, portal motes, pickups) --------------------
+const MAX_PARTICLES = 300;
+const particleGeo = new THREE.BufferGeometry();
+const particlePositions = new Float32Array(MAX_PARTICLES * 3);
+const particleColors = new Float32Array(MAX_PARTICLES * 3);
+particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+const particleMat = new THREE.PointsMaterial({ size: 0.14, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false });
+const particlePoints = new THREE.Points(particleGeo, particleMat);
+scene.add(particlePoints);
+const particles = []; // { pos: Vector3, vel: Vector3, life, maxLife, color: [r,g,b] }
+function spawnParticles(pos, color, count, speed, life) {
+  for (let i = 0; i < count; i++) {
+    if (particles.length >= MAX_PARTICLES) particles.shift();
+    const dir = new THREE.Vector3((Math.random()-0.5), Math.random()*0.6+0.1, (Math.random()-0.5)).normalize();
+    particles.push({
+      pos: pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0.1, (Math.random()-0.5)*0.3)),
+      vel: dir.multiplyScalar(speed * (0.5 + Math.random())),
+      life: life, maxLife: life, color
+    });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vel.y -= dt * 1.2;
+    p.pos.addScaledVector(p.vel, dt);
+  }
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    if (i < particles.length) {
+      const p = particles[i];
+      const a = Math.max(0, p.life / p.maxLife);
+      particlePositions[i*3] = p.pos.x; particlePositions[i*3+1] = p.pos.y; particlePositions[i*3+2] = p.pos.z;
+      particleColors[i*3] = p.color[0]*a; particleColors[i*3+1] = p.color[1]*a; particleColors[i*3+2] = p.color[2]*a;
+    } else {
+      particlePositions[i*3+1] = -999;
+    }
+  }
+  particleGeo.attributes.position.needsUpdate = true;
+  particleGeo.attributes.color.needsUpdate = true;
+}
+
+// --- Enemies: melee, ranged, shielded, boss ------------------------------------
+function makeEnemy(x, z, parentGroup, hp, color, scale, kind) {
   const g = new THREE.Group();
   const m = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.5 * scale, 1.0 * scale, 4, 8),
@@ -392,100 +593,223 @@ function makeEnemy(x, z, parentGroup, hp, color, scale) {
   m.position.y = 1.0 * scale;
   m.castShadow = true;
   g.add(m);
+  if (kind === 'shielded') {
+    const shield = new THREE.Mesh(new THREE.CircleGeometry(0.55 * scale, 12), new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide }));
+    shield.position.set(0, 1.0 * scale, 0.5 * scale);
+    g.add(shield);
+    g.userData_shieldMesh = shield;
+  }
+  // Shape marker above the head — lets colorblind mode distinguish enemy type by silhouette, not just color.
+  const markerGeo = kind === 'ranged' ? new THREE.SphereGeometry(0.16, 8, 8)
+    : kind === 'shielded' ? new THREE.ConeGeometry(0.18, 0.32, 6)
+    : kind === 'boss' ? new THREE.OctahedronGeometry(0.24, 0)
+    : new THREE.BoxGeometry(0.24, 0.24, 0.24);
+  const marker = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  marker.position.y = 2.05 * scale;
+  marker.visible = false; // toggled on by applyColorblindMode() once settings are loaded — never reference gameState here, it isn't defined yet at this point in the script
+  g.add(marker);
+  g.userData.marker = marker;
   g.position.set(x, 0, z);
-  g.userData = { hp, maxHp: hp, state: 'idle', hitCooldown: 0, attackTagged: false, flash: 0 };
+  g.userData = Object.assign(g.userData, { hp, maxHp: hp, kind: kind || 'melee', hitCooldown: 0, attackTagged: false, flash: 0, rangedCooldown: 1 + Math.random() });
   parentGroup.add(g);
   return g;
 }
-// Zone 1 enemies — the shrine quest requires clearing these
 const enemies1 = [
-  makeEnemy(-10, -8, zone1, 3, 0x8a2a2a, 1),
-  makeEnemy(18, 6, zone1, 3, 0x8a2a2a, 1),
-  makeEnemy(-16, 15, zone1, 3, 0x8a2a2a, 1)
+  makeEnemy(-10, -8, zone1, 3, 0x8a2a2a, 1, 'melee'),
+  makeEnemy(18, 6, zone1, 3, 0x8a2a2a, 1, 'melee'),
+  makeEnemy(-16, 15, zone1, 3, 0x8a2a2a, 1, 'melee')
 ];
-// Zone 2 enemies — tougher, larger, a step up in difficulty
 const enemies2 = [
-  makeEnemy(10, -12, zone2, 6, 0x4a1a4a, 1.4),
-  makeEnemy(-14, 10, zone2, 6, 0x4a1a4a, 1.4)
+  makeEnemy(10, -12, zone2, 6, 0x4a1a4a, 1.4, 'melee'),
+  makeEnemy(-14, 10, zone2, 6, 0x4a1a4a, 1.4, 'melee'),
+  makeEnemy(20, 14, zone2, 5, 0x6a2a6a, 1.2, 'ranged'),
+  makeEnemy(-8, -20, zone2, 8, 0x555599, 1.3, 'shielded')
 ];
-const boss = makeEnemy(0, -22, zone2, 18, 0x8f3b42, 2.1);
-boss.userData.attackCooldown = 2.2;
-boss.userData.telegraph = 0;
-boss.userData.phase = 1;
-boss.visible = false;
-boss.userData.boss = true;
+const enemies3 = [
+  makeEnemy(14, -10, zone3, 8, 0x2a6a5a, 1.3, 'ranged'),
+  makeEnemy(-16, 12, zone3, 10, 0x336655, 1.4, 'shielded'),
+  makeEnemy(10, 16, zone3, 7, 0x2a6a5a, 1.2, 'ranged'),
+  makeEnemy(-10, -16, zone3, 9, 0x225544, 1.3, 'melee')
+];
+[enemies1, enemies2, enemies3].forEach((list, idx) => {
+  const mult = ZONE_DIFFICULTY[idx + 1];
+  list.forEach(e => { e.userData.hp = Math.round(e.userData.hp * mult); e.userData.maxHp = e.userData.hp; e.userData.dmgMult = mult; });
+});
+
+const boss = makeEnemy(0, -22, zone2, 22, 0x8f3b42, 2.1, 'boss');
+boss.userData.attackCooldown = 2.2; boss.userData.telegraph = 0; boss.userData.phase = 1; boss.visible = false; boss.userData.boss = true;
 const bossRing = new THREE.Mesh(new THREE.TorusGeometry(2.5,.06,8,32), new THREE.MeshBasicMaterial({color:0xff624f,transparent:true,opacity:.5}));
 bossRing.rotation.x=-Math.PI/2; bossRing.position.y=.05; zone2.add(bossRing); bossRing.visible=false;
+function applyColorblindMode(on) {
+  [...enemies1, ...enemies2, ...enemies3, boss].forEach(e => { if (e.userData.marker) e.userData.marker.visible = on; });
+}
+applyColorblindMode(settings.colorblind);
 
-// --- Quest / game state ---------------------------------------------------------
-const gameState = { currentZone: 1, questStage: 0, zone2Complete: false, ended: false, portalLock: 0, hitFlash: 0, introHint: true, bossAwakened: false };
+// Projectiles fired by ranged enemies
+const projectiles = []; // { mesh, vel, life }
+const projGeo = new THREE.SphereGeometry(0.18, 8, 8);
+function fireProjectile(from, atPos, color, speed) {
+  const mesh = new THREE.Mesh(projGeo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.5 }));
+  mesh.position.copy(from); mesh.position.y = 1.1;
+  const dir = atPos.clone().sub(from); dir.y = 0; dir.normalize();
+  scene.add(mesh);
+  projectiles.push({ mesh, vel: dir.multiplyScalar(speed), life: 4 });
+}
+
+// --- Game state, currency, upgrades --------------------------------------------
+const gameState = {
+  currentZone: 1, questStage: 0, zone2Complete: false, ended: false, paused: false,
+  portalLock: 0, hitFlash: 0, bossAwakened: false, shards: 0,
+  visited: { 1: true, 2: false, 3: false }, unlocked: { 1: true, 2: false, 3: false },
+  upgrades: { hp: 0, stam: 0, dmg: 0 }, comboCount: 0, comboWindow: 0,
+  isBlocking: false, parryWindow: 0, colorblind: settings.colorblind
+};
+let attackDamage = 1;
+let maxPlayerHP = 100, maxStamina = 100;
 let stamina = 100, staminaRegenDelay = 0;
 const staminaBar = document.getElementById('stamina-bar');
 const bossWrap = document.getElementById('boss-wrap'), bossBar = document.getElementById('boss-bar');
-function updateStamina() { staminaBar.style.width = stamina + '%'; }
+const shardCountEl = document.getElementById('shard-count');
+const pickupToast = document.getElementById('pickup-toast');
+function updateStamina() { staminaBar.style.width = Math.max(0, stamina / maxStamina * 100) + '%'; }
 function spendStamina(amount) { if (stamina < amount) return false; stamina -= amount; staminaRegenDelay = .8; updateStamina(); return true; }
-function awakenBoss() { if (gameState.bossAwakened) return; gameState.bossAwakened=true; boss.visible=true; bossRing.visible=true; bossWrap.style.opacity='1'; setQuest('The Ashen Warden has awakened'); objectiveEl.textContent='DEFEAT THE ASHEN WARDEN'; }
+function updateShardUI() { shardCountEl.textContent = gameState.shards; }
+function showPickupToast(msg) { pickupToast.textContent = msg; pickupToast.style.opacity = '1'; clearTimeout(showPickupToast._t); showPickupToast._t = setTimeout(() => pickupToast.style.opacity = '0', 1400); }
+function awakenBoss() { if (gameState.bossAwakened) return; gameState.bossAwakened=true; boss.visible=true; bossRing.visible=true; bossWrap.style.opacity='1'; setQuest('The Ashen Warden has awakened'); objectiveEl.textContent='DEFEAT THE ASHEN WARDEN'; audio.alarm(); }
 
-// questStage: 0 = not started, 1 = active (clear enemies), 2 = complete (portal open)
 const questTitleEl = document.getElementById('quest-banner');
 const questTextEl = document.getElementById('quest-text');
-function setQuest(msg) {
-  if (msg) { questTextEl.textContent = msg; questTitleEl.style.opacity = '1'; }
-  else { questTitleEl.style.opacity = '0'; }
-}
+function setQuest(msg) { if (msg) { questTextEl.textContent = msg; questTitleEl.style.opacity = '1'; } else { questTitleEl.style.opacity = '0'; } }
+
+// --- Synthesized audio (Web Audio API — no external files) --------------------
+const audio = (function () {
+  let ctx = null, master = null, ambientNodes = null;
+  function ensure() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = settings.volume / 100;
+    master.connect(ctx.destination);
+  }
+  function setVolume(v) { if (master) master.gain.value = v / 100; }
+  function tone(freq, dur, type, vol, sweep) {
+    if (!settings.sfxOn) return;
+    ensure();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = type || 'sine'; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    if (sweep) osc.frequency.exponentialRampToValueAtTime(Math.max(20, sweep), ctx.currentTime + dur);
+    gain.gain.setValueAtTime(vol || 0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.connect(gain); gain.connect(master);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  }
+  function noiseBurst(dur, vol, filterFreq) {
+    if (!settings.sfxOn) return;
+    ensure();
+    const bufferSize = ctx.sampleRate * dur;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = filterFreq || 1200;
+    const gain = ctx.createGain(); gain.gain.value = vol || 0.2;
+    src.connect(filter); filter.connect(gain); gain.connect(master);
+    src.start();
+  }
+  return {
+    swing: () => noiseBurst(0.12, 0.15, 2200),
+    hit: () => tone(180, 0.15, 'square', 0.18, 60),
+    dodge: () => noiseBurst(0.18, 0.12, 900),
+    block: () => tone(320, 0.1, 'square', 0.15, 200),
+    parry: () => tone(900, 0.2, 'sine', 0.25, 1400),
+    portal: () => tone(200, 0.5, 'sine', 0.2, 700),
+    pickup: () => tone(700, 0.18, 'triangle', 0.2, 1100),
+    damage: () => tone(120, 0.2, 'sawtooth', 0.18, 50),
+    alarm: () => tone(300, 0.6, 'sine', 0.2, 700),
+    upgrade: () => tone(500, 0.35, 'triangle', 0.22, 1300),
+    startAmbient: () => {
+      if (!settings.sfxOn) return;
+      ensure();
+      if (ambientNodes) return;
+      const osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator(), gain = ctx.createGain();
+      osc1.type = 'sine'; osc1.frequency.value = 60;
+      osc2.type = 'sine'; osc2.frequency.value = 90.5;
+      gain.gain.value = 0.05;
+      osc1.connect(gain); osc2.connect(gain); gain.connect(master);
+      osc1.start(); osc2.start();
+      ambientNodes = { osc1, osc2, gain };
+    },
+    setVolume
+  };
+})();
 
 // --- Input: virtual joystick -------------------------------------------------
 const joystickZone = document.getElementById('joystick-zone');
 const joystickKnob = document.getElementById('joystick-knob');
 let joyActive = false, joyStartX = 0, joyStartY = 0, joyVec = { x: 0, y: 0 };
-
-function joyPointerDown(e) {
-  joyActive = true;
-  const t = e.touches ? e.touches[0] : e;
-  joyStartX = t.clientX; joyStartY = t.clientY;
-}
+function joyPointerDown(e) { joyActive = true; const t = e.touches ? e.touches[0] : e; joyStartX = t.clientX; joyStartY = t.clientY; }
 function joyPointerMove(e) {
   if (!joyActive) return;
   const t = e.touches ? e.touches[0] : e;
   let dx = t.clientX - joyStartX, dy = t.clientY - joyStartY;
-  const max = 45;
+  const max = 45 * (settings.sensitivity / 100);
   const len = Math.hypot(dx, dy);
   if (len > max) { dx = dx / len * max; dy = dy / len * max; }
   joystickKnob.style.left = (35 + dx) + 'px';
   joystickKnob.style.top = (35 + dy) + 'px';
   joyVec.x = dx / max; joyVec.y = dy / max;
 }
-function joyPointerUp() {
-  joyActive = false; joyVec.x = 0; joyVec.y = 0;
-  joystickKnob.style.left = '35px'; joystickKnob.style.top = '35px';
-}
-joystickZone.addEventListener('touchstart', joyPointerDown, { passive: true });
+function joyPointerUp() { joyActive = false; joyVec.x = 0; joyVec.y = 0; joystickKnob.style.left = '35px'; joystickKnob.style.top = '35px'; }
 joystickZone.addEventListener('touchmove', joyPointerMove, { passive: true });
 joystickZone.addEventListener('touchend', joyPointerUp);
-joystickZone.addEventListener('mousedown', joyPointerDown);
-window.addEventListener('mousemove', joyPointerMove);
-window.addEventListener('mouseup', joyPointerUp);
+joystickZone.addEventListener('pointerdown', joyPointerDown);
+window.addEventListener('pointermove', joyPointerMove);
+window.addEventListener('pointerup', joyPointerUp);
 
-// Keyboard fallback (desktop testing)
 const keys = {};
 window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-// --- Attack / Dodge buttons ---------------------------------------------------
+// --- Attack / Dodge / Block ---------------------------------------------------
 let attackTimer = 0, dodgeTimer = 0, dodgeCooldown = 0;
-document.getElementById('attack-btn').addEventListener('pointerdown', e => { e.preventDefault(); doAttack(); });
-document.getElementById('dodge-btn').addEventListener('pointerdown', e => { e.preventDefault(); doDodge(); });
-window.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); doAttack(); } if (e.key.toLowerCase() === 'shift') doDodge(); });
+function bindTap(id, handler) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); handler(); });
+}
+bindTap('attack-btn', doAttack);
+bindTap('dodge-btn', doDodge);
+const blockBtn = document.getElementById('block-btn');
+function setBlocking(on) {
+  gameState.isBlocking = on && !gameState.ended && !cutscenePlaying;
+  blockBtn.classList.toggle('blocking', gameState.isBlocking);
+  playerShield.visible = gameState.isBlocking;
+  if (gameState.isBlocking) gameState.parryWindow = 0.22;
+}
+blockBtn.addEventListener('pointerdown', e => { e.preventDefault(); setBlocking(true); });
+blockBtn.addEventListener('pointerup', () => setBlocking(false));
+blockBtn.addEventListener('pointerleave', () => setBlocking(false));
+blockBtn.addEventListener('pointercancel', () => setBlocking(false));
+window.addEventListener('keydown', e => {
+  if (e.key === ' ') { e.preventDefault(); doAttack(); }
+  if (e.key.toLowerCase() === 'shift') doDodge();
+  if (e.key.toLowerCase() === 'c') setBlocking(true);
+});
+window.addEventListener('keyup', e => { if (e.key.toLowerCase() === 'c') setBlocking(false); });
 
 function doAttack() {
-  if (attackTimer > 0 || gameState.ended || cutscenePlaying || !spendStamina(12)) return;
-  attackTimer = 0.4;
-  enemies1.concat(enemies2, [boss]).forEach(en => en.userData.attackTagged = false);
+  if (gameState.paused || gameState.ended || cutscenePlaying) return;
+  if (attackTimer > 0 || !spendStamina(12)) return;
+  if (gameState.comboWindow > 0) gameState.comboCount = (gameState.comboCount % 3) + 1; else gameState.comboCount = 1;
+  gameState.comboWindow = 0.9;
+  attackTimer = gameState.comboCount === 3 ? 0.5 : 0.4;
+  audio.swing();
+  [...enemies1, ...enemies2, ...enemies3, boss].forEach(en => en.userData.attackTagged = false);
 }
 function doDodge() {
-  if (dodgeCooldown > 0 || dodgeTimer > 0 || gameState.ended || cutscenePlaying || !spendStamina(28)) return;
-  dodgeTimer = 0.3;
-  dodgeCooldown = 1.0;
+  if (gameState.paused || gameState.ended || cutscenePlaying) return;
+  if (dodgeCooldown > 0 || dodgeTimer > 0 || !spendStamina(28)) return;
+  dodgeTimer = 0.3; dodgeCooldown = 1.0;
+  audio.dodge(); vibrate(20);
 }
 
 // --- Camera follow state -----------------------------------------------------
@@ -498,10 +822,6 @@ const cutsceneLines = [
   "Something ancient still watches from the ruins.",
   "It is time to wake it."
 ];
-  var cutscenePlaying = true;
-  var cutsceneStep = 0, cutsceneTimer = 0;
-  var cutsceneEl = document.getElementById('cutscene');
-  var cutsceneText = document.getElementById('cutscene-text');
 camera.position.set(0, 14, 30);
 camera.lookAt(0, 0, 0);
 
@@ -515,111 +835,269 @@ function advanceCutscene() {
   cutsceneTimer = 0;
 }
 function endCutscene() {
+  if (!cutscenePlaying) return;
   cutscenePlaying = false;
+  cutsceneEl.style.pointerEvents = 'none';
   cutsceneEl.style.opacity = '0';
-  setTimeout(() => cutsceneEl.style.display = 'none', 1200);
-  const introQuestTitle = document.getElementById('quest-banner');
-  const introQuestText = document.getElementById('quest-text');
-  if (introQuestTitle && introQuestText) {
-    introQuestText.textContent = 'Find the glowing shrine to awaken the ward';
-  introQuestTitle.style.opacity = '1';
-  setTimeout(() => introQuestTitle.style.opacity = '0', 4200);
+  setTimeout(() => cutsceneEl.style.display = 'none', 1000);
+  audio.startAmbient();
+  setQuest('Find the glowing shrine to awaken the ward');
+  setTimeout(() => setQuest(''), 4200);
   const hint = document.getElementById('nolu-hint');
-  const dialogue = document.getElementById('nolu-dialogue');
   if (hint) { hint.style.opacity = '1'; setTimeout(() => hint.style.opacity = '0', 7000); }
-  if (dialogue) dialogue.textContent = 'The hills remember every footstep. I am Nolu — stay close, and I will guide you.';
+  dialogueTextEl.textContent = pickLine('intro');
   document.getElementById('skip-btn').style.display = 'none';
-
-  }
 }
-document.getElementById('skip-btn').addEventListener('click', endCutscene);
-  document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
-document.getElementById('start-btn').addEventListener('click', function () { requestLandscapeMode(); endCutscene(); });
- document.getElementById('start-btn').addEventListener('touchstart', function () { requestLandscapeMode(); endCutscene(); }, { passive: true });
-  document.getElementById('restart-btn').addEventListener('click', resetGame);
-  var rotateDismiss = document.getElementById('rotate-dismiss');
-  if (rotateDismiss) {
-    var hideRotateTip = function () { document.getElementById('rotate-prompt').classList.remove('show'); };
-    rotateDismiss.addEventListener('click', hideRotateTip);
-    rotateDismiss.addEventListener('touchstart', hideRotateTip, { passive: true });
-  }
-  if (typeof THREE === 'undefined') {
-    document.getElementById('cutscene-text').style.display = 'none';
-    document.getElementById('start-btn').style.display = 'none';
-    document.getElementById('load-error').style.display = 'block';
-    document.getElementById('skip-btn').style.display = 'none';
-  }
 
 // --- Health / prompt HUD -----------------------------------------------------
 let playerHP = 100;
-const maxPlayerHP = 100;
 const healthValue = document.getElementById('health-value');
 const objectiveEl = document.getElementById('objective');
 const healthBar = document.getElementById('health-bar');
 const gameOverEl = document.getElementById('game-over');
-function updateHealth() { healthBar.style.width = playerHP + '%'; healthValue.textContent = playerHP + ' / ' + maxPlayerHP; }
-function damagePlayer(amount) { if (dodgeTimer > 0 || gameState.ended) return; playerHP = Math.max(0, playerHP - amount); gameState.hitFlash = 0.18; updateHealth(); if (playerHP === 0) endGame(false); }
-function endGame(won) { gameState.ended = true; gameOverEl.style.display = 'flex'; document.getElementById('game-over-title').textContent = won ? 'JOURNEY COMPLETE' : 'WARDEN FALLEN'; document.getElementById('game-over-copy').textContent = won ? 'The ruins are quiet. The path is yours.' : 'The shades reclaimed the hills.'; }
+function updateHealth() { healthBar.style.width = Math.max(0, playerHP / maxPlayerHP * 100) + '%'; healthValue.textContent = Math.max(0,Math.round(playerHP)) + ' / ' + maxPlayerHP; }
+function damagePlayer(amount) {
+  if (dodgeTimer > 0 || gameState.ended || gameState.paused) return;
+  if (gameState.isBlocking) {
+    if (gameState.parryWindow > 0) {
+      audio.parry(); vibrate([10,40,10]);
+      document.getElementById('parry-flash').style.transition = 'none';
+      document.getElementById('parry-flash').style.opacity = '0.5';
+      setTimeout(() => { document.getElementById('parry-flash').style.transition = 'opacity .3s'; document.getElementById('parry-flash').style.opacity = '0'; }, 30);
+      return; // fully negated
+    }
+    amount *= 0.2;
+    audio.block();
+  } else { audio.damage(); }
+  playerHP = Math.max(0, playerHP - amount);
+  gameState.hitFlash = 0.18;
+  vibrate(35);
+  updateHealth();
+  if (playerHP === 0) endGame(false);
+}
+function endGame(won) {
+  gameState.ended = true;
+  gameOverEl.style.display = 'flex';
+  document.getElementById('game-over-title').textContent = won ? 'JOURNEY COMPLETE' : 'WARDEN FALLEN';
+  document.getElementById('game-over-copy').textContent = won ? 'The ruins are quiet. The path is yours.' : 'The shades reclaimed the hills.';
+  if (won) clearSaveData();
+}
 function resetGame() {
-  gameState.ended=false; gameState.currentZone=1; gameState.questStage=0; gameState.zone2Complete=false; gameState.bossAwakened=false;
-  gameState.portalLock=0; playerHP=maxPlayerHP; stamina=100; attackTimer=0; dodgeTimer=0; dodgeCooldown=0;
-  zone1.visible=true; zone2.visible=false; portalToZone2.visible=false; boss.visible=false; bossRing.visible=false; bossWrap.style.opacity='0';
-  enemies1.forEach(e=>{e.userData.hp=e.userData.maxHp;e.visible=true;e.position.y=0;}); enemies2.forEach(e=>{e.userData.hp=e.userData.maxHp;e.visible=true;}); boss.userData.hp=boss.userData.maxHp;
-  player.position.set(0,0,5); gameOverEl.style.display='none'; updateHealth(); updateStamina(); setQuest('Find the glowing shrine to awaken the ward');
+  gameState.ended=false; gameState.paused=false; gameState.currentZone=1; gameState.questStage=0; gameState.zone2Complete=false; gameState.bossAwakened=false;
+  gameState.portalLock=0; gameState.shards=0; gameState.upgrades={hp:0,stam:0,dmg:0};
+  gameState.unlocked={1:true,2:false,3:false}; gameState.visited={1:true,2:false,3:false};
+  maxPlayerHP = 100; maxStamina = 100; attackDamage = 1;
+  playerHP=maxPlayerHP; stamina=maxStamina; attackTimer=0; dodgeTimer=0; dodgeCooldown=0;
+  zone1.visible=true; zone2.visible=false; zone3.visible=false;
+  portal1to2.visible=false; portal2to3.visible=false; boss.visible=false; bossRing.visible=false; bossWrap.style.opacity='0';
+  [enemies1, enemies2, enemies3].forEach(list => list.forEach(e => { e.userData.hp = e.userData.maxHp; e.visible = true; e.scale.setScalar(1); }));
+  boss.userData.hp = boss.userData.maxHp;
+  allShards.forEach(s => { s.userData.collected = false; s.visible = true; });
+  updateShardUI();
+  player.position.set(0,0,5);
+  gameOverEl.style.display='none'; updateHealth(); updateStamina(); setQuest('Find the glowing shrine to awaken the ward');
+  objectiveEl.textContent = 'AWAITING SHRINE';
+  document.getElementById('zone-name').textContent = 'THE HILLS';
+  document.getElementById('pause-overlay').classList.remove('show');
+  clearSaveData();
 }
+document.getElementById('restart-btn').addEventListener('click', resetGame);
+document.getElementById('pause-restart-btn').addEventListener('click', () => { togglePause(false); resetGame(); });
+
+// --- Save / Load ---------------------------------------------------------------
+function collectSaveSnapshot() {
+  return {
+    zone: gameState.currentZone, questStage: gameState.questStage, zone2Complete: gameState.zone2Complete,
+    bossAwakened: gameState.bossAwakened, shards: gameState.shards, upgrades: gameState.upgrades,
+    unlocked: gameState.unlocked, visited: gameState.visited,
+    deadEnemies: [...enemies1, ...enemies2, ...enemies3].map(e => e.userData.hp <= 0),
+    shardsCollected: allShards.map(s => s.userData.collected)
+  };
+}
+function doSave() { if (!gameState.ended) writeSaveData(collectSaveSnapshot()); }
+function applySaveData(data) {
+  gameState.currentZone = data.zone || 1; gameState.questStage = data.questStage || 0;
+  gameState.zone2Complete = !!data.zone2Complete; gameState.bossAwakened = !!data.bossAwakened;
+  gameState.shards = data.shards || 0; gameState.upgrades = data.upgrades || {hp:0,stam:0,dmg:0};
+  gameState.unlocked = data.unlocked || {1:true,2:false,3:false}; gameState.visited = data.visited || {1:true,2:false,3:false};
+  maxPlayerHP = 100 + gameState.upgrades.hp * 20; maxStamina = 100 + gameState.upgrades.stam * 20; attackDamage = 1 + gameState.upgrades.dmg * 2;
+  playerHP = maxPlayerHP; stamina = maxStamina;
+  const allEnemies = [...enemies1, ...enemies2, ...enemies3];
+  (data.deadEnemies || []).forEach((dead, i) => { if (allEnemies[i] && dead) { allEnemies[i].userData.hp = 0; allEnemies[i].visible = false; } });
+  (data.shardsCollected || []).forEach((got, i) => { if (allShards[i] && got) { allShards[i].userData.collected = true; allShards[i].visible = false; } });
+  if (gameState.zone2Complete) { boss.userData.hp = 0; boss.visible = false; bossRing.visible = false; }
+  else if (gameState.bossAwakened) { boss.visible = true; bossRing.visible = true; bossWrap.style.opacity = '1'; }
+  if (gameState.questStage >= 2) portal1to2.visible = true;
+  if (gameState.zone2Complete) portal2to3.visible = true;
+  zone1.visible = gameState.currentZone === 1; zone2.visible = gameState.currentZone === 2; zone3.visible = gameState.currentZone === 3;
+  const spawn = zoneSpawns[gameState.currentZone];
+  player.position.set(spawn.x, 0, spawn.z);
+  updateShardUI(); updateHealth(); updateStamina();
+}
+
+const existingSave = loadSaveData();
+if (existingSave) document.getElementById('continue-btn').style.display = 'inline-block';
+document.getElementById('continue-btn').addEventListener('click', function () {
+  requestLandscapeMode(); endCutscene();
+  if (existingSave) applySaveData(existingSave);
+});
+document.getElementById('continue-btn').addEventListener('touchstart', function () {
+  requestLandscapeMode(); endCutscene();
+  if (existingSave) applySaveData(existingSave);
+}, { passive: true });
+
+document.getElementById('skip-btn').addEventListener('click', endCutscene);
+document.getElementById('skip-btn').addEventListener('touchstart', endCutscene, { passive: true });
+document.getElementById('start-btn').addEventListener('click', function () { requestLandscapeMode(); endCutscene(); });
+document.getElementById('start-btn').addEventListener('touchstart', function () { requestLandscapeMode(); endCutscene(); }, { passive: true });
+(function () {
+  var rotateDismiss = document.getElementById('rotate-dismiss');
+  var hideRotateTip = function () { document.getElementById('rotate-prompt').classList.remove('show'); };
+  rotateDismiss.addEventListener('click', hideRotateTip);
+  rotateDismiss.addEventListener('touchstart', hideRotateTip, { passive: true });
+})();
+if (typeof THREE === 'undefined') {
+  document.getElementById('cutscene-text').style.display = 'none';
+  document.getElementById('start-btn').style.display = 'none';
+  document.getElementById('continue-btn').style.display = 'none';
+  document.getElementById('load-error').style.display = 'block';
+  document.getElementById('skip-btn').style.display = 'none';
+}
+
 const promptEl = document.getElementById('prompt');
-function setPrompt(msg) {
-  if (msg) { promptEl.textContent = msg; promptEl.style.opacity = '1'; }
-  else { promptEl.style.opacity = '0'; }
+function setPrompt(msg) { if (msg) { promptEl.textContent = msg; promptEl.style.opacity = '1'; } else { promptEl.style.opacity = '0'; } }
+
+// --- Pause / Options / Map / Upgrade panels -------------------------------------
+const pauseOverlay = document.getElementById('pause-overlay');
+function togglePause(force) {
+  const next = typeof force === 'boolean' ? force : !gameState.paused;
+  gameState.paused = next && !cutscenePlaying && !gameState.ended;
+  pauseOverlay.classList.toggle('show', gameState.paused);
 }
+document.getElementById('pause-btn').addEventListener('click', () => togglePause());
+document.getElementById('resume-btn').addEventListener('click', () => togglePause(false));
+document.getElementById('pause-options-btn').addEventListener('click', () => { openOptions(); });
 
-// --- Main loop -----------------------------------------------------------------
-const clock = new THREE.Clock();
-const moveSpeed = 5.0;
-const playerVel = new THREE.Vector3();
-updateHealth();
+const optionsOverlay = document.getElementById('options-overlay');
+function openOptions() { optionsOverlay.classList.add('show'); }
+document.getElementById('options-btn').addEventListener('click', openOptions);
+document.getElementById('options-close-btn').addEventListener('click', () => optionsOverlay.classList.remove('show'));
+const volumeSlider = document.getElementById('volume-slider');
+volumeSlider.value = settings.volume;
+volumeSlider.addEventListener('input', () => { settings.volume = +volumeSlider.value; audio.setVolume(settings.volume); saveSettings(settings); });
+const sfxToggle = document.getElementById('sfx-toggle');
+sfxToggle.textContent = settings.sfxOn ? 'ON' : 'OFF';
+sfxToggle.classList.toggle('on', settings.sfxOn);
+sfxToggle.addEventListener('click', () => { settings.sfxOn = !settings.sfxOn; sfxToggle.textContent = settings.sfxOn ? 'ON' : 'OFF'; sfxToggle.classList.toggle('on', settings.sfxOn); saveSettings(settings); });
+const sensitivitySlider = document.getElementById('sensitivity-slider');
+sensitivitySlider.value = settings.sensitivity;
+sensitivitySlider.addEventListener('input', () => { settings.sensitivity = +sensitivitySlider.value; saveSettings(settings); });
+const colorblindToggle = document.getElementById('colorblind-toggle');
+colorblindToggle.textContent = settings.colorblind ? 'ON' : 'OFF';
+colorblindToggle.classList.toggle('on', settings.colorblind);
+colorblindToggle.addEventListener('click', () => { settings.colorblind = !settings.colorblind; gameState.colorblind = settings.colorblind; colorblindToggle.textContent = settings.colorblind ? 'ON' : 'OFF'; colorblindToggle.classList.toggle('on', settings.colorblind); saveSettings(settings); applyColorblindMode(settings.colorblind); });
 
-function checkObstacleCollision(nextPos) {
-  const list = gameState.currentZone === 1 ? obstacles : obstacles2;
-  for (const o of list) {
-    const dx = nextPos.x - o.mesh.position.x, dz = nextPos.z - o.mesh.position.z;
-    if (Math.hypot(dx, dz) < o.radius + 0.6) return true;
-  }
-  return false;
+const mapOverlay = document.getElementById('map-overlay');
+const zoneListEl = document.getElementById('zone-list');
+function renderZoneList() {
+  zoneListEl.innerHTML = '';
+  [1,2,3].forEach(z => {
+    const row = document.createElement('div');
+    row.className = 'zone-row' + (gameState.unlocked[z] ? '' : ' locked');
+    const label = document.createElement('span');
+    label.textContent = zoneNames[z] + (gameState.currentZone === z ? ' (here)' : '');
+    row.appendChild(label);
+    if (gameState.unlocked[z] && gameState.currentZone !== z) {
+      const btn = document.createElement('button');
+      btn.className = 'zone-travel-btn'; btn.textContent = 'TRAVEL';
+      btn.addEventListener('click', () => { goToZone(z); mapOverlay.classList.remove('show'); });
+      row.appendChild(btn);
+    } else if (!gameState.unlocked[z]) {
+      const lock = document.createElement('span'); lock.textContent = '🔒'; row.appendChild(lock);
+    }
+    zoneListEl.appendChild(row);
+  });
 }
+document.getElementById('map-btn').addEventListener('click', () => { renderZoneList(); mapOverlay.classList.add('show'); });
+document.getElementById('map-close-btn').addEventListener('click', () => mapOverlay.classList.remove('show'));
 
-function teleportToZone(zoneNum) {
+const upgradeOverlay = document.getElementById('upgrade-overlay');
+function upgradeCost(level) { return 10 + level * 8; }
+function refreshUpgradeUI() {
+  document.getElementById('cost-hp').textContent = upgradeCost(gameState.upgrades.hp);
+  document.getElementById('cost-stam').textContent = upgradeCost(gameState.upgrades.stam);
+  document.getElementById('cost-dmg').textContent = upgradeCost(gameState.upgrades.dmg) + 5;
+  document.getElementById('upgrade-hp-btn').disabled = gameState.shards < upgradeCost(gameState.upgrades.hp);
+  document.getElementById('upgrade-stam-btn').disabled = gameState.shards < upgradeCost(gameState.upgrades.stam);
+  document.getElementById('upgrade-dmg-btn').disabled = gameState.shards < upgradeCost(gameState.upgrades.dmg) + 5;
+}
+document.getElementById('upgrade-hp-btn').addEventListener('click', () => {
+  const cost = upgradeCost(gameState.upgrades.hp);
+  if (gameState.shards < cost) return;
+  gameState.shards -= cost; gameState.upgrades.hp++; maxPlayerHP += 20; playerHP = maxPlayerHP;
+  updateHealth(); updateShardUI(); refreshUpgradeUI(); audio.upgrade(); doSave();
+});
+document.getElementById('upgrade-stam-btn').addEventListener('click', () => {
+  const cost = upgradeCost(gameState.upgrades.stam);
+  if (gameState.shards < cost) return;
+  gameState.shards -= cost; gameState.upgrades.stam++; maxStamina += 20; stamina = maxStamina;
+  updateStamina(); updateShardUI(); refreshUpgradeUI(); audio.upgrade(); doSave();
+});
+document.getElementById('upgrade-dmg-btn').addEventListener('click', () => {
+  const cost = upgradeCost(gameState.upgrades.dmg) + 5;
+  if (gameState.shards < cost) return;
+  gameState.shards -= cost; gameState.upgrades.dmg++; attackDamage += 2;
+  updateShardUI(); refreshUpgradeUI(); audio.upgrade(); doSave();
+});
+document.getElementById('upgrade-close-btn').addEventListener('click', () => upgradeOverlay.classList.remove('show'));
+
+// --- Zone travel (portals + map fast-travel) ------------------------------------
+function goToZone(zoneNum) {
   const zoneFlash = document.getElementById('zone-flash');
   zoneFlash.style.opacity = '1';
+  audio.portal();
   setTimeout(() => {
+    Object.values(zoneGroups).forEach(g => g.visible = false);
     gameState.currentZone = zoneNum;
-    if (zoneNum === 2) {
-      zone1.visible = false; zone2.visible = true;
-      player.position.set(portalToZone1.position.x, 0, portalToZone1.position.z - 3);
-      setQuest('Defeat the ruin-wardens to find a way back');
-      objectiveEl.textContent = 'RUIN-WARDENS REMAIN';
-    } else {
-      zone1.visible = true; zone2.visible = false;
-      player.position.set(portalToZone2.position.x - 3, 0, portalToZone2.position.z);
-      setQuest('');
-    }
+    gameState.visited[zoneNum] = true;
+    zoneGroups[zoneNum].visible = true;
+    const spawn = zoneSpawns[zoneNum];
+    player.position.set(spawn.x, 0, spawn.z);
+    if (zoneNum === 2) { setQuest(gameState.zone2Complete ? '' : 'Defeat the ruin-wardens to find a way back'); objectiveEl.textContent = gameState.zone2Complete ? 'RUINS CLEARED' : 'RUIN-WARDENS REMAIN'; }
+    else if (zoneNum === 3) { setQuest('The vale holds its own dangers'); objectiveEl.textContent = 'EXPLORE THE VALE'; }
+    else { setQuest(''); objectiveEl.textContent = gameState.questStage >= 2 ? 'PORTAL OPEN' : 'AWAITING SHRINE'; }
+    document.getElementById('zone-name').textContent = zoneNames[zoneNum].toUpperCase();
     zoneFlash.style.opacity = '0';
+    doSave();
   }, 380);
 }
 
-// --- Nolu dialogue: live AI with an offline fallback ------------------------
+// --- Nolu dialogue: contextual offline lines + optional live AI ---------------
 const dialogueEl = document.getElementById('dialogue');
 const dialogueTextEl = document.getElementById('dialogue-text');
 const talkBtn = document.getElementById('talk-btn');
 const voiceBtn = document.getElementById('voice-btn');
-const noluHint = document.getElementById('nolu-hint');
 const noluNameplate = document.getElementById('nolu-nameplate');
 const dialogueHistory = [];
-const offlineLines = [
-  'The shrine is awake. Stay close to the blue fire and listen for the shades.',
-  'I am Nolu. The Ashen Warden stole the dawn from these hills. We take it back one step at a time.',
-  'The ruins beyond the portal are not empty. Keep your stamina for the warden’s heavy strikes.'
-];
+const contextualLines = {
+  intro: ["The hills remember every footstep. I am Nolu — stay close.", "Something stirred these ruins long before we arrived."],
+  questActive: ["Three shades still walk these hills. Finish it.", "Keep your footing — the shades hit harder than they look."],
+  questComplete: ["The shrine answers. A path east has opened.", "Whatever waits past that portal, we face it together."],
+  zone2: ["The ruins are not empty. Save your stamina for the wardens.", "Something bigger sleeps deeper in these ruins."],
+  boss: ["The Ashen Warden wakes. Watch for the telegraph before it strikes.", "Block or dodge the heavy swing — don't trade hits with it."],
+  zone3: ["The vale is quiet, but quiet rarely lasts.", "Watch the shielded ones — flank them, don't face them."],
+  victory: ["The path is yours now, Warden.", "Rest a moment. You've earned it."]
+};
+function pickLine(bucket) { const arr = contextualLines[bucket] || contextualLines.intro; return arr[Math.floor(Math.random() * arr.length)]; }
+function currentBucket() {
+  if (gameState.ended) return 'victory';
+  if (boss.visible) return 'boss';
+  if (gameState.currentZone === 3) return 'zone3';
+  if (gameState.currentZone === 2) return 'zone2';
+  if (gameState.questStage >= 2) return 'questComplete';
+  if (gameState.questStage === 1) return 'questActive';
+  return 'intro';
+}
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -629,14 +1107,16 @@ function speak(text) {
 }
 async function askNolu() {
   talkBtn.disabled = true; dialogueEl.style.display = 'block'; dialogueTextEl.textContent = 'Nolu is listening…';
-  const prompt = `Nolu is a brave young warden exploring a ruined fantasy world. Give one concise in-character field briefing for the player. Current zone: ${gameState.currentZone}. Objective: ${document.getElementById('objective').textContent}.`;
+  const bucket = currentBucket();
+  const fallback = pickLine(bucket);
+  const prompt = `Nolu is a brave young warden exploring a ruined fantasy world. Give one concise in-character field briefing. Current zone: ${gameState.currentZone}. Objective: ${document.getElementById('objective') ? document.getElementById('objective').textContent : ''}.`;
   try {
     const response = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ messages:[...dialogueHistory, {role:'user', content:prompt}] }) });
     if (!response.ok) throw new Error('dialogue unavailable');
     const data = await response.json();
-    dialogueTextEl.textContent = data.text || offlineLines[Math.floor(Math.random()*offlineLines.length)];
+    dialogueTextEl.textContent = data.text || fallback;
   } catch (error) {
-    dialogueTextEl.textContent = offlineLines[Math.floor(Math.random()*offlineLines.length)];
+    dialogueTextEl.textContent = fallback;
   } finally {
     dialogueHistory.push({ role:'assistant', content:dialogueTextEl.textContent });
     talkBtn.disabled = false;
@@ -645,33 +1125,53 @@ async function askNolu() {
 talkBtn.addEventListener('click', askNolu);
 voiceBtn.addEventListener('click', () => speak(dialogueTextEl.textContent));
 
+// --- Main loop -----------------------------------------------------------------
+const clock = new THREE.Clock();
+const moveSpeed = 5.0;
+const playerVel = new THREE.Vector3();
+updateHealth(); updateStamina(); updateShardUI(); refreshUpgradeUI();
+
+function checkObstacleCollision(nextPos) {
+  const list = zoneObstacles[gameState.currentZone] || [];
+  for (const o of list) {
+    const dx = nextPos.x - o.mesh.position.x, dz = nextPos.z - o.mesh.position.z;
+    if (Math.hypot(dx, dz) < o.radius + 0.6) return true;
+  }
+  return false;
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (gameState.hitFlash > 0) { gameState.hitFlash -= dt; canvas.style.filter = 'brightness(1.7) saturate(1.4)'; } else canvas.style.filter = '';
-  if (gameState.portalLock > 0) gameState.portalLock -= dt;
 
-  // --- Cutscene camera pan ---
   if (cutscenePlaying) {
     cutsceneTimer += dt;
     const angle = clock.elapsedTime * 0.08;
-    camera.position.x = Math.sin(angle) * 30;
-    camera.position.z = Math.cos(angle) * 30;
-    camera.position.y = 14;
+    camera.position.x = Math.sin(angle) * 30; camera.position.z = Math.cos(angle) * 30; camera.position.y = 14;
     camera.lookAt(0, 1, 0);
     if (cutsceneTimer > 3.2) advanceCutscene();
     renderer.render(scene, camera);
     return;
   }
 
-  // --- Movement input (joystick or keyboard) ---
+  if (gameState.paused || document.querySelector('.panel-overlay.show')) { renderer.render(scene, camera); return; }
+
+  dayTime += dt / DAY_LENGTH_SECONDS; if (dayTime > 1) dayTime -= 1;
+  if (Math.floor(clock.elapsedTime * 4) !== Math.floor((clock.elapsedTime - dt) * 4)) updateSky();
+
+  if (gameState.hitFlash > 0) { gameState.hitFlash -= dt; canvas.style.filter = 'brightness(1.7) saturate(1.4)'; } else canvas.style.filter = '';
+  if (gameState.portalLock > 0) gameState.portalLock -= dt;
+  if (gameState.comboWindow > 0) gameState.comboWindow -= dt; else gameState.comboCount = 0;
+  if (gameState.isBlocking && gameState.parryWindow > 0) gameState.parryWindow -= dt;
+  if (gameState.isBlocking) spendStamina(6 * dt);
+
   let ix = joyVec.x, iy = joyVec.y;
   if (keys['w'] || keys['arrowup']) iy = -1;
   if (keys['s'] || keys['arrowdown']) iy = 1;
   if (keys['a'] || keys['arrowleft']) ix = -1;
   if (keys['d'] || keys['arrowright']) ix = 1;
 
-  const moving = Math.hypot(ix, iy) > 0.08;
+  const moving = Math.hypot(ix, iy) > 0.08 && !gameState.isBlocking;
   if (moving) {
     const targetAngle = Math.atan2(ix, -iy) + camYaw;
     player.rotation.y += (targetAngle - player.rotation.y) * 0.2;
@@ -680,139 +1180,176 @@ function animate() {
     const next = player.position.clone().add(playerVel);
     next.x = Math.max(-95, Math.min(95, next.x));
     next.z = Math.max(-95, Math.min(95, next.z));
-    if (!checkObstacleCollision(next)) player.position.copy(next);
+    if (!checkObstacleCollision(next)) {
+      player.position.copy(next);
+      if (Math.random() < 0.3) spawnParticles(player.position.clone(), [0.6,0.6,0.5], 1, 0.6, 0.5);
+    }
   }
-
-  // bob animation while moving
   body.position.y = 1.05 + (moving ? Math.sin(clock.elapsedTime * 10) * 0.05 : 0);
 
-  // --- Attack animation (sword swing) ---
   if (attackTimer > 0) {
     attackTimer -= dt;
-    const t = 1 - attackTimer / 0.4;
-    swordGroup.rotation.y = Math.sin(t * Math.PI) * 2.2;
-  } else {
-    swordGroup.rotation.y *= 0.8;
-  }
+    const t = 1 - attackTimer / (gameState.comboCount === 3 ? 0.5 : 0.4);
+    swordGroup.rotation.y = Math.sin(t * Math.PI) * (gameState.comboCount === 3 ? 3.2 : 2.2);
+  } else { swordGroup.rotation.y *= 0.8; }
   if (dodgeTimer > 0) dodgeTimer -= dt;
   if (dodgeCooldown > 0) dodgeCooldown -= dt;
   if (staminaRegenDelay > 0) staminaRegenDelay -= dt;
-  else if (stamina < 100) { stamina = Math.min(100, stamina + 24 * dt); updateStamina(); }
+  else if (stamina < maxStamina && !gameState.isBlocking) { stamina = Math.min(maxStamina, stamina + 24 * dt); updateStamina(); }
 
-  // --- Enemy AI: chase + simple combat (active zone only) ---
-  const activeEnemies = gameState.currentZone === 1 ? enemies1 : enemies2.concat(gameState.bossAwakened ? [boss] : []);
-  activeEnemies.forEach(en => {
-    if (en.userData.hp <= 0) { en.visible = false; if (en.userData.boss) { bossWrap.style.opacity='0'; endGame(true); } return; }
+  // --- Active-zone enemies ---
+  const activeList = { 1: enemies1, 2: enemies2.concat(gameState.bossAwakened ? [boss] : []), 3: enemies3 }[gameState.currentZone] || [];
+  const hitDamage = attackDamage * (gameState.comboCount === 3 ? 2 : 1);
+  activeList.forEach(en => {
+    if (en.userData.hp <= 0) { en.visible = false; if (en.userData.boss) { bossWrap.style.opacity='0'; unlockZone3(); setQuest('The Ashen Warden falls — a new path has opened west'); setTimeout(() => setQuest(''), 5000); } return; }
     const dist = en.position.distanceTo(player.position);
     const isBoss = !!en.userData.boss;
+
     if (isBoss) {
       bossBar.style.width = Math.max(0, en.userData.hp / en.userData.maxHp * 100) + '%';
       en.userData.attackCooldown -= dt;
       if (en.userData.telegraph > 0) { en.userData.telegraph -= dt; en.children[0].material.emissive.set(0xffb000); en.children[0].material.emissiveIntensity = 2.5; }
       else if (en.userData.attackCooldown <= 0 && dist < 9) { en.userData.telegraph = .55; en.userData.attackCooldown = en.userData.phase === 2 ? 1.25 : 1.8; }
       else if (en.userData.attackCooldown <= 0) en.userData.attackCooldown = .6;
-      if (en.userData.telegraph <= 0 && en.userData.telegraph > -.08) { if (dist < 3.2) damagePlayer(en.userData.phase === 2 ? 18 : 12); en.userData.telegraph = -1; }
+      if (en.userData.telegraph <= 0 && en.userData.telegraph > -.08) { if (dist < 3.2) damagePlayer((en.userData.phase === 2 ? 18 : 12)); en.userData.telegraph = -1; }
       if (en.userData.hp < en.userData.maxHp * .5) en.userData.phase = 2;
-    }
-    if (dist < (isBoss ? 22 : 20)) {
-      const dir = player.position.clone().sub(en.position).normalize();
-      if (dist > (isBoss ? 2.7 : 1.4)) {
-        en.position.addScaledVector(dir, (isBoss ? 1.5 : 2.2) * dt);
-        en.rotation.y = Math.atan2(dir.x, dir.z);
-      } else if (en.userData.hitCooldown <= 0 && !isBoss) {
-        damagePlayer(8);
-        en.userData.hitCooldown = 1.0;
+    } else if (en.userData.kind === 'ranged') {
+      en.userData.rangedCooldown -= dt;
+      if (dist < 22 && dist > 4 && en.userData.rangedCooldown <= 0) {
+        fireProjectile(en.position.clone(), player.position.clone(), 0xdd6666, 8);
+        en.userData.rangedCooldown = 2.2;
       }
+    }
+
+    const chaseRange = isBoss ? 22 : 20;
+    const stopDist = isBoss ? 2.7 : (en.userData.kind === 'ranged' ? 6 : 1.4);
+    if (dist < chaseRange) {
+      const dir = player.position.clone().sub(en.position).normalize();
+      if (dist > stopDist) { en.position.addScaledVector(dir, (isBoss ? 1.5 : 2.2) * dt); en.rotation.y = Math.atan2(dir.x, dir.z); }
+      else if (en.userData.hitCooldown <= 0 && !isBoss && en.userData.kind !== 'ranged') { damagePlayer(8 * (en.userData.dmgMult||1)); en.userData.hitCooldown = 1.0; }
     }
     if (en.userData.hitCooldown > 0) en.userData.hitCooldown -= dt;
 
-    // player attack hits nearby enemy
-    if (attackTimer > 0.15 && attackTimer < 0.3 && dist < 2.2 && !en.userData.attackTagged) {
-      en.userData.hp -= 1;
+    if (attackTimer > 0.15 && attackTimer < 0.32 && dist < 2.3 && !en.userData.attackTagged) {
+      let blocked = false;
+      if (en.userData.kind === 'shielded') {
+        const toPlayer = player.position.clone().sub(en.position).normalize();
+        const forward = new THREE.Vector3(Math.sin(en.rotation.y), 0, Math.cos(en.rotation.y));
+        blocked = forward.dot(toPlayer) > 0.25; // hit from the front — shield holds
+      }
       en.userData.attackTagged = true;
-      en.userData.flash = 0.12;
-      en.scale.setScalar(1.12);
-      if (en.userData.hp <= 0) { en.visible = false; setQuest('Shade defeated'); setTimeout(() => setQuest(''), 700); }
+      if (blocked) {
+        audio.block();
+        if (en.userData_shieldMesh) { en.userData_shieldMesh.material.emissive = new THREE.Color(0xffffff); }
+      } else {
+        en.userData.hp -= hitDamage;
+        en.userData.flash = 0.12; en.scale.setScalar(1.12);
+        spawnParticles(en.position.clone().add(new THREE.Vector3(0,1,0)), [1,0.9,0.4], 8, 3, 0.4);
+        audio.hit(); vibrate(15);
+        if (en.userData.hp <= 0) { en.visible = false; setQuest(isBoss ? '' : 'Enemy defeated'); if (!isBoss) setTimeout(() => setQuest(''), 700); }
+      }
     }
-    if (en.userData.flash > 0) { en.userData.flash -= dt; en.children[0].material.emissive.set(0xffffff); en.children[0].material.emissiveIntensity = 1.5; } else { en.children[0].material.emissive.set(0x000000); en.children[0].material.emissiveIntensity = 0; en.scale.lerp(new THREE.Vector3(1,1,1), 0.2); }
+    if (en.userData.flash > 0) { en.userData.flash -= dt; en.children[0].material.emissive.set(0xffffff); en.children[0].material.emissiveIntensity = 1.5; }
+    else { en.children[0].material.emissive.set(0x000000); en.children[0].material.emissiveIntensity = 0; en.scale.lerp(new THREE.Vector3(1,1,1), 0.2); }
   });
 
-  // --- Zone objectives and shrine progression ---
-  if (gameState.currentZone === 2) {
-    const remaining = enemies2.filter(e => e.userData.hp > 0).length;
-    if (!gameState.zone2Complete) {
-      setQuest(`Defeat the ruin-wardens — ${remaining} remaining`);
-      objectiveEl.textContent = remaining + ' WARDENS REMAIN';
-      if (remaining === 0 && !gameState.bossAwakened) {
-        awakenBoss();
-      }
+  // --- Projectiles ---
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.life -= dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    if (p.mesh.position.distanceTo(player.position) < 0.9) { damagePlayer(6); scene.remove(p.mesh); projectiles.splice(i,1); continue; }
+    if (p.life <= 0) { scene.remove(p.mesh); projectiles.splice(i,1); }
+  }
+
+  // --- Shards ---
+  allShards.forEach(s => {
+    if (s.userData.collected || !s.parent.visible) return;
+    s.rotation.y += dt * 2;
+    if (s.getWorldPosition(new THREE.Vector3()).distanceTo(player.position) < 1.4) {
+      s.userData.collected = true; s.visible = false;
+      gameState.shards++; updateShardUI(); showPickupToast('Shard collected'); audio.pickup(); vibrate(10);
+      spawnParticles(player.position.clone().add(new THREE.Vector3(0,1,0)), [0.5,0.95,0.8], 10, 2, 0.6);
+      doSave();
+    }
+  });
+
+  // --- Altar (upgrades) ---
+  if (gameState.currentZone === 1) {
+    const nearAltar = player.position.distanceTo(altar.position) < 2.4;
+    if (nearAltar && !altar.userData.promptShown) {
+      altar.userData.promptShown = true;
+      refreshUpgradeUI();
+      upgradeOverlay.classList.add('show');
+    } else if (!nearAltar) {
+      altar.userData.promptShown = false;
     }
   }
 
-  // --- Shrine / quest progression (zone 1 only) ---
+  // --- Zone 2 objective ---
+  if (gameState.currentZone === 2 && !gameState.zone2Complete) {
+    const remaining = enemies2.filter(e => e.userData.hp > 0).length;
+    setQuest(`Defeat the ruin-wardens — ${remaining} remaining`);
+    objectiveEl.textContent = remaining + ' WARDENS REMAIN';
+    if (remaining === 0 && !gameState.bossAwakened) awakenBoss();
+  }
+
+  // --- Zone 1 shrine / quest ---
   if (gameState.currentZone === 1) {
     let nearShrine = player.position.distanceTo(shrine.position) < 3;
-
     if (gameState.questStage === 0 && nearShrine) {
       gameState.questStage = 1;
-      shrineMat.color.set(0x66ccff);
-      shrineMat.emissive.set(0x2288ff);
-      shrineMat.emissiveIntensity = 1.2;
-      shrineLight.color.set(0x66ccff);
-      shrineLight.intensity = 2;
-      setQuest('Defeat the 3 shades roaming the hills');
+      shrineMat.color.set(0x66ccff); shrineMat.emissive.set(0x2288ff); shrineMat.emissiveIntensity = 1.2;
+      shrineLight.color.set(0x66ccff); shrineLight.intensity = 2;
+      setQuest('Defeat the 3 shades roaming the hills'); doSave();
     }
-
     if (gameState.questStage === 1) {
       const remaining = enemies1.filter(e => e.userData.hp > 0).length;
       setQuest(`Defeat the shades — ${remaining} remaining`);
       objectiveEl.textContent = remaining + ' SHADES REMAIN';
       if (remaining === 0) {
-        gameState.questStage = 2;
-        portalToZone2.visible = true;
+        gameState.questStage = 2; portal1to2.visible = true; gameState.unlocked[2] = true;
         setQuest('Shrine awakened — a portal has opened to the east');
-        objectiveEl.textContent = 'PORTAL OPEN';
+        objectiveEl.textContent = 'PORTAL OPEN'; doSave();
       }
     }
-
-    if (gameState.questStage === 2) {
-      setPrompt(nearShrine ? 'Shrine awakened' : '');
-    } else {
-      setPrompt('');
-    }
-
+    setPrompt(gameState.questStage === 2 && nearShrine ? 'Shrine awakened' : '');
     shrine.rotation.y += dt * 1.5;
     shrine.position.y = 1.4 + Math.sin(clock.elapsedTime * 2) * 0.15;
+    altar.rotation.y += dt * 0.4;
   }
 
-  // --- Portal teleport check ---
-  if (gameState.currentZone === 1 && portalToZone2.visible) {
-    portalToZone2.userData.ring.rotation.z += dt;
-    if (gameState.portalLock <= 0 && player.position.distanceTo(portalToZone2.position) < 2.2) { gameState.portalLock = 1.5; teleportToZone(2); }
+  // --- Portal checks ---
+  function checkPortal(portal, targetZone) {
+    if (!portal.visible) return;
+    portal.userData.ring.rotation.z += dt;
+    if (gameState.portalLock <= 0 && player.position.distanceTo(portal.position) < 2.2) { gameState.portalLock = 1.5; goToZone(targetZone); }
   }
-  if (gameState.currentZone === 2) {
-    portalToZone1.userData.ring.rotation.z += dt;
-    if (gameState.portalLock <= 0 && player.position.distanceTo(portalToZone1.position) < 2.2) { gameState.portalLock = 1.5; teleportToZone(1); }
-  }
+  if (gameState.currentZone === 1) checkPortal(portal1to2, 2);
+  if (gameState.currentZone === 2) { checkPortal(portal2to1, 1); checkPortal(portal2to3, 3); }
+  if (gameState.currentZone === 3) checkPortal(portal3to2, 2);
 
-  // --- Compact world map keeps orientation clear on a phone -------------------
+  updateParticles(dt);
+
+  // --- Minimap ---
   const map = document.getElementById('minimap'), mapCtx = map.getContext('2d');
-  mapCtx.clearRect(0,0,224,224); mapCtx.save(); mapCtx.translate(112,112); mapCtx.rotate(-player.rotation.y);
-  mapCtx.fillStyle='rgba(34,65,55,.8)'; mapCtx.fillRect(-100,-100,200,200);
-  mapCtx.strokeStyle='rgba(150,205,220,.25)'; mapCtx.strokeRect(-82,-82,164,164);
-  const drawDot=(obj,color,size)=>{mapCtx.fillStyle=color;mapCtx.beginPath();mapCtx.arc(obj.position.x-player.position.x,-(obj.position.z-player.position.z),size,0,Math.PI*2);mapCtx.fill();};
-  drawDot(player,'#ffffff',4); if (gameState.currentZone===1) drawDot(shrine,'#78d8ff',5); else { enemies2.forEach(e=>{if(e.userData.hp>0)drawDot(e,'#ef6c78',4);}); if(boss.visible)drawDot(boss,'#ffb06b',7); }
+  mapCtx.clearRect(0,0,192,192); mapCtx.save(); mapCtx.translate(96,96); mapCtx.rotate(-player.rotation.y);
+  mapCtx.fillStyle = gameState.currentZone===1?'rgba(34,65,55,.8)':gameState.currentZone===2?'rgba(58,42,36,.8)':'rgba(31,58,52,.8)';
+  mapCtx.fillRect(-85,-85,170,170);
+  mapCtx.strokeStyle='rgba(150,205,220,.25)'; mapCtx.strokeRect(-70,-70,140,140);
+  const drawDot=(obj,color,size)=>{ const wp = obj.getWorldPosition ? obj.getWorldPosition(new THREE.Vector3()) : obj.position; mapCtx.fillStyle=color;mapCtx.beginPath();mapCtx.arc(wp.x-player.position.x,-(wp.z-player.position.z),size,0,Math.PI*2);mapCtx.fill(); };
+  drawDot({position:player.position},'#ffffff',4);
+  if (gameState.currentZone===1) { drawDot(shrine,'#78d8ff',5); allShards.forEach(s=>{if(!s.userData.collected && s.parent===zone1) drawDot(s,'#8fe0d0',3);}); }
+  else if (gameState.currentZone===2) { enemies2.forEach(e=>{if(e.userData.hp>0)drawDot(e,'#ef6c78',4);}); if(boss.visible)drawDot(boss,'#ffb06b',7); }
+  else { enemies3.forEach(e=>{if(e.userData.hp>0)drawDot(e,'#ef6c78',4);}); }
   mapCtx.restore();
 
-  // --- Camera follow (orbit slightly behind player facing) ---
-  const behind = new THREE.Vector3(
-    Math.sin(player.rotation.y) * -camDist,
-    camHeight,
-    Math.cos(player.rotation.y) * -camDist
-  );
+  // --- Camera follow ---
+  const behind = new THREE.Vector3(Math.sin(player.rotation.y) * -camDist, camHeight, Math.cos(player.rotation.y) * -camDist);
   const desiredCamPos = player.position.clone().add(behind);
   camera.position.lerp(desiredCamPos, 0.12);
   camera.lookAt(player.position.x, player.position.y + 1.3, player.position.z);
+  skyDome.position.copy(camera.position);
   const screenPoint = player.position.clone().project(camera);
   noluNameplate.style.left = ((screenPoint.x * .5 + .5) * window.innerWidth) + 'px';
   noluNameplate.style.top = ((-screenPoint.y * .5 + .5) * window.innerHeight - 52) + 'px';
@@ -821,6 +1358,13 @@ function animate() {
 
   renderer.render(scene, camera);
 }
+
+function unlockZone3() {
+  if (gameState.zone2Complete) return;
+  gameState.zone2Complete = true; gameState.unlocked[3] = true; portal2to3.visible = true;
+  setQuest('A new path has opened west'); doSave();
+}
+
 animate();
 
 window.addEventListener('resize', () => {
